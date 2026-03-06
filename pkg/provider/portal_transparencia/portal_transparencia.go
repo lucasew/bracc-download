@@ -12,11 +12,10 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"regexp"
 	"strings"
-	"time"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/davecgh/go-spew/spew"
 )
 
 const baseURL = "https://portaldatransparencia.gov.br/download-de-dados"
@@ -40,6 +39,13 @@ type dataset struct {
 	URL         *url.URL
 	Slug        string
 	Periodicity Periodicity
+}
+
+type arquivoEntry struct {
+	Ano    string
+	Mes    string
+	Dia    string
+	Origem string
 }
 
 type Provider struct {
@@ -106,116 +112,50 @@ func (p *Provider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
 
 	return func(yield func(provider.Job) bool) {
 		for _, dataset := range datasets {
-			switch dataset.Periodicity {
-			case PeriodicityMonthly:
-				if !p.generateMonthlyJobs(ctx, dataset, yield) {
+			jobs, err := p.datasetJobs(ctx, dataset)
+			if err != nil {
+				slog.Error("portal_transparencia dataset parse error", "dataset", dataset.Slug, "url", dataset.URL.String(), "error", err)
+				continue
+			}
+			for _, job := range jobs {
+				if !yield(job) {
 					return
 				}
-			case PeriodicityYearly:
-				if !p.generateYearlyJobs(ctx, dataset, yield) {
-					return
-				}
-			default:
-				spew.Dump("portal_transparencia_unknown_periodicity", dataset.Slug, dataset.URL.String())
 			}
 		}
 	}, nil
 }
 
-func (p *Provider) generateMonthlyJobs(ctx context.Context, dataset dataset, yield func(provider.Job) bool) bool {
-	now := time.Now().UTC()
-	misses := 0
-	foundAny := false
+func (p *Provider) datasetJobs(ctx context.Context, dataset dataset) ([]provider.Job, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, dataset.URL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := httpcontext.Client(ctx).Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("unexpected HTTP status %d for %s", resp.StatusCode, dataset.URL)
+	}
 
-	for offset := 0; offset < p.monthsBack; offset++ {
-		d := time.Date(now.Year(), now.Month()-time.Month(offset), 1, 0, 0, 0, 0, time.UTC)
-		u := *dataset.URL
-		u.Path = path.Join(dataset.URL.Path, d.Format("200601"))
+	entries, err := parseArquivoEntries(resp.Body)
+	if err != nil {
+		return nil, err
+	}
 
-		ok := p.probe(ctx, &u)
+	jobs := make([]provider.Job, 0, len(entries))
+	for _, entry := range entries {
+		key, ok := datasetKey(dataset.Periodicity, entry)
 		if !ok {
-			if foundAny {
-				misses++
-				if misses >= p.consecutiveMisses {
-					return true
-				}
-			}
 			continue
 		}
-
-		foundAny = true
-		misses = 0
-		if !yield(simple.NewJob(u)) {
-			return false
-		}
-	}
-
-	return true
-}
-
-func (p *Provider) generateYearlyJobs(ctx context.Context, dataset dataset, yield func(provider.Job) bool) bool {
-	now := time.Now().UTC()
-	misses := 0
-	foundAny := false
-
-	for offset := 0; offset < p.yearsBack; offset++ {
-		year := now.Year() - offset
 		u := *dataset.URL
-		u.Path = path.Join(dataset.URL.Path, fmt.Sprintf("%04d", year))
-
-		ok := p.probe(ctx, &u)
-		if !ok {
-			if foundAny {
-				misses++
-				if misses >= p.consecutiveMisses {
-					return true
-				}
-			}
-			continue
-		}
-
-		foundAny = true
-		misses = 0
-		if !yield(simple.NewJob(u)) {
-			return false
-		}
+		u.Path = path.Join(dataset.URL.Path, key)
+		jobs = append(jobs, simple.NewJob(u))
 	}
-
-	return true
-}
-
-func (p *Provider) probe(ctx context.Context, u *url.URL) bool {
-	headReq, err := http.NewRequest(http.MethodHead, u.String(), nil)
-	if err == nil {
-		headResp, err := httpcontext.Client(ctx).Do(headReq.WithContext(ctx))
-		if err == nil {
-			slog.Debug("portal_transparencia probe", "method", http.MethodHead, "url", u.String(), "status", headResp.StatusCode)
-			headResp.Body.Close()
-			if headResp.StatusCode >= 200 && headResp.StatusCode < 300 {
-				return true
-			}
-		} else {
-			slog.Debug("portal_transparencia probe error", "method", http.MethodHead, "url", u.String(), "error", err)
-		}
-	} else {
-		slog.Debug("portal_transparencia probe request error", "method", http.MethodHead, "url", u.String(), "error", err)
-	}
-
-	getReq, err := http.NewRequest(http.MethodGet, u.String(), nil)
-	if err != nil {
-		slog.Debug("portal_transparencia probe request error", "method", http.MethodGet, "url", u.String(), "error", err)
-		return false
-	}
-	getReq.Header.Set("Range", "bytes=0-0")
-	getResp, err := httpcontext.Client(ctx).Do(getReq.WithContext(ctx))
-	if err != nil {
-		slog.Debug("portal_transparencia probe error", "method", http.MethodGet, "url", u.String(), "error", err)
-		return false
-	}
-	defer getResp.Body.Close()
-	slog.Debug("portal_transparencia probe", "method", http.MethodGet, "url", u.String(), "status", getResp.StatusCode)
-	_, _ = io.Copy(io.Discard, io.LimitReader(getResp.Body, 1))
-	return getResp.StatusCode == http.StatusOK || getResp.StatusCode == http.StatusPartialContent
+	return jobs, nil
 }
 
 func parseDatasets(base *url.URL, body io.Reader) ([]dataset, error) {
@@ -264,12 +204,54 @@ func parseDatasets(base *url.URL, body io.Reader) ([]dataset, error) {
 			Slug:        slug,
 			Periodicity: detectPeriodicity(periodicityText),
 		}
-		spew.Dump(d)
 		datasets = append(datasets, d)
 		seen[slug] = struct{}{}
 	}
 
 	return datasets, nil
+}
+
+var arquivoPushRE = regexp.MustCompile(`arquivos\.push\(\{"ano"\s*:\s*"([^"]*)",\s*"mes"\s*:\s*"([^"]*)",\s*"dia"\s*:\s*"([^"]*)",\s*"origem"\s*:\s*"([^"]*)"\}\);`)
+
+func parseArquivoEntries(body io.Reader) ([]arquivoEntry, error) {
+	doc, err := goquery.NewDocumentFromReader(body)
+	if err != nil {
+		return nil, err
+	}
+
+	var entries []arquivoEntry
+	doc.Find("script").Each(func(_ int, script *goquery.Selection) {
+		for _, match := range arquivoPushRE.FindAllStringSubmatch(script.Text(), -1) {
+			if len(match) != 5 {
+				continue
+			}
+			entry := arquivoEntry{
+				Ano:    match[1],
+				Mes:    match[2],
+				Dia:    match[3],
+				Origem: match[4],
+			}
+			entries = append(entries, entry)
+		}
+	})
+	return entries, nil
+}
+
+func datasetKey(periodicity Periodicity, entry arquivoEntry) (string, bool) {
+	switch periodicity {
+	case PeriodicityMonthly:
+		if entry.Ano == "" || entry.Mes == "" {
+			return "", false
+		}
+		return entry.Ano + entry.Mes, true
+	case PeriodicityYearly:
+		if entry.Ano == "" {
+			return "", false
+		}
+		return entry.Ano, true
+	default:
+		return "", false
+	}
 }
 
 func detectPeriodicity(s string) Periodicity {
