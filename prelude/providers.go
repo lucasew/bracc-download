@@ -5,5 +5,6 @@ import (
 	_ "bracc/pkg/provider/cvm_processo_sancionador"
 	_ "bracc/pkg/provider/dou"
 	_ "bracc/pkg/provider/eu_sanctions"
+	_ "bracc/pkg/provider/portal_transparencia"
 	_ "bracc/pkg/provider/rfb_nextcloud"
 )
