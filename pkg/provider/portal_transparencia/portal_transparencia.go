@@ -9,7 +9,6 @@ import (
 	"net/http"
 	"net/url"
 	"path"
-	"slices"
 	"strings"
 	"time"
 
@@ -220,17 +219,14 @@ func parseDatasets(base *url.URL, body io.Reader) ([]dataset, error) {
 			continue
 		}
 
-		tds := row.Find("td").Children()
-		// o primeiro td tem o link relativo dentro
-		// o segundo tem a periodicidade
-		// completa a implementação
-		//
+		tds := row.Find("td")
+		if tds.Length() != 2 {
+			continue
+		}
 
-		periodicityType := detectPeriodicity(periodicity.Data)
-
-		linkURL, err := url.Parse(linkURL)
-		if err != nil {
-			slog.Error("Bad url found", linkURL)
+		link, ok := tds.Eq(0).Find("a[href]").First().Attr("href")
+		if !ok || strings.TrimSpace(link) == "" {
+			continue
 		}
 
 		u, err := base.Parse(link)
@@ -249,13 +245,13 @@ func parseDatasets(base *url.URL, body io.Reader) ([]dataset, error) {
 			continue
 		}
 
-		rowText := normalizeText(cells.Text())
+		periodicityText := normalizeText(tds.Eq(1).Text())
 		d := dataset{
 			URL:         u,
 			Slug:        slug,
-			Periodicity: detectPeriodicity(rowText),
+			Periodicity: detectPeriodicity(periodicityText),
 		}
-		// spew.Dump(d)
+		spew.Dump(d)
 		datasets = append(datasets, d)
 		seen[slug] = struct{}{}
 	}
@@ -264,12 +260,13 @@ func parseDatasets(base *url.URL, body io.Reader) ([]dataset, error) {
 }
 
 func detectPeriodicity(s string) Periodicity {
+	s = normalizeText(s)
 	switch {
-	case strings.Contains(s, "Mensal"):
+	case strings.Contains(s, "mensal"):
 		return PeriodicityMonthly
-	case strings.Contains(s, "Anual"):
+	case strings.Contains(s, "anual"):
 		return PeriodicityYearly
-	case strings.Contains(s, "Diário"):
+	case strings.Contains(s, "diário"):
 		return PeriodicityDaily
 	default:
 		return PeriodicityUnknown
