@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -48,81 +49,43 @@ func NewWebDAVJobProvider(rawURL string) (*WebDAVJobProvider, error) {
 
 func (p *WebDAVJobProvider) Jobs() (iter.Seq[Job], error) {
 	return func(yield func(Job) bool) {
-		yield(&WebDAVMirrorJob{
-			root:   p.url,
-			client: p.client,
-		})
+		ctx := context.Background()
+		pending := []*url.URL{p.url}
+		seenCollections := map[string]struct{}{}
+
+		for len(pending) > 0 {
+			current := pending[0]
+			pending = pending[1:]
+
+			normCollection := normalizeURLPath(current.Path)
+			if _, ok := seenCollections[normCollection]; ok {
+				continue
+			}
+			seenCollections[normCollection] = struct{}{}
+
+			entries, err := p.list(ctx, current)
+			if err != nil {
+				slog.Error("webdav list failed", "collection", current.String(), "error", err)
+				return
+			}
+
+			for _, entry := range entries {
+				if entry.IsCollection {
+					pending = append(pending, entry.URL)
+					continue
+				}
+				if !yield(&WebDAVFileJob{
+					url:    entry.URL,
+					client: p.client,
+				}) {
+					return
+				}
+			}
+		}
 	}, nil
 }
 
-type WebDAVMirrorJob struct {
-	root   *url.URL
-	client *http.Client
-}
-
-func (j *WebDAVMirrorJob) GetURL() *url.URL {
-	return j.root
-}
-
-func (j *WebDAVMirrorJob) Download(ctx context.Context, dir string) error {
-	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-		return err
-	}
-
-	pending := []*url.URL{j.root}
-	seenCollections := map[string]struct{}{}
-
-	for len(pending) > 0 {
-		current := pending[0]
-		pending = pending[1:]
-
-		normCollection := normalizeURLPath(current.Path)
-		if _, ok := seenCollections[normCollection]; ok {
-			continue
-		}
-		seenCollections[normCollection] = struct{}{}
-
-		entries, err := j.list(ctx, current)
-		if err != nil {
-			return err
-		}
-
-		for _, entry := range entries {
-			rel, err := relativeURLPath(j.root.Path, entry.URL.Path)
-			if err != nil {
-				continue
-			}
-			if rel == "" {
-				continue
-			}
-
-			localRel, err := urlPathToFSPath(rel)
-			if err != nil {
-				return err
-			}
-			localPath := filepath.Join(dir, localRel)
-
-			if entry.IsCollection {
-				if err := os.MkdirAll(localPath, os.ModePerm); err != nil {
-					return err
-				}
-				pending = append(pending, entry.URL)
-				continue
-			}
-
-			if err := os.MkdirAll(filepath.Dir(localPath), os.ModePerm); err != nil {
-				return err
-			}
-			if err := j.downloadFile(ctx, entry.URL, localPath); err != nil {
-				return err
-			}
-		}
-	}
-
-	return nil
-}
-
-func (j *WebDAVMirrorJob) list(ctx context.Context, collection *url.URL) ([]davEntry, error) {
+func (p *WebDAVJobProvider) list(ctx context.Context, collection *url.URL) ([]davEntry, error) {
 	req, err := http.NewRequestWithContext(ctx, "PROPFIND", collection.String(), bytes.NewBufferString(propfindBody))
 	if err != nil {
 		return nil, err
@@ -130,7 +93,7 @@ func (j *WebDAVMirrorJob) list(ctx context.Context, collection *url.URL) ([]davE
 	req.Header.Set("Depth", "1")
 	req.Header.Set("Content-Type", "application/xml; charset=utf-8")
 
-	resp, err := j.client.Do(req)
+	resp, err := p.client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -157,17 +120,23 @@ func (j *WebDAVMirrorJob) list(ctx context.Context, collection *url.URL) ([]davE
 		if normalizeURLPath(u.Path) == currentPath {
 			continue
 		}
-		items = append(items, davEntry{
-			URL:          u,
-			IsCollection: r.IsCollection(),
-		})
+		items = append(items, davEntry{URL: u, IsCollection: r.IsCollection()})
 	}
 
 	return items, nil
 }
 
-func (j *WebDAVMirrorJob) downloadFile(ctx context.Context, source *url.URL, destination string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, source.String(), nil)
+type WebDAVFileJob struct {
+	url    *url.URL
+	client *http.Client
+}
+
+func (j *WebDAVFileJob) GetURL() *url.URL {
+	return j.url
+}
+
+func (j *WebDAVFileJob) Download(ctx context.Context, dir string) error {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, j.url.String(), nil)
 	if err != nil {
 		return err
 	}
@@ -180,10 +149,13 @@ func (j *WebDAVMirrorJob) downloadFile(ctx context.Context, source *url.URL, des
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return fmt.Errorf("GET %s failed: status=%d body=%q", source, resp.StatusCode, string(b))
+		return fmt.Errorf("GET %s failed: status=%d body=%q", j.url, resp.StatusCode, string(b))
 	}
 
-	tmpPath := destination + ".part"
+	filename := fileNameFromURLPath(j.url.Path)
+	tmpPath := filepath.Join(dir, filename+".part")
+	finalPath := filepath.Join(dir, filename)
+
 	f, err := os.Create(tmpPath)
 	if err != nil {
 		return err
@@ -198,7 +170,19 @@ func (j *WebDAVMirrorJob) downloadFile(ctx context.Context, source *url.URL, des
 		_ = os.Remove(tmpPath)
 		return closeErr
 	}
-	return os.Rename(tmpPath, destination)
+	return os.Rename(tmpPath, finalPath)
+}
+
+func fileNameFromURLPath(p string) string {
+	base := path.Base(p)
+	if base == "." || base == "/" || base == "" {
+		return "downloaded_file"
+	}
+	decoded, err := url.PathUnescape(base)
+	if err != nil || decoded == "" {
+		return base
+	}
+	return decoded
 }
 
 type davEntry struct {
@@ -251,18 +235,6 @@ func resolveHrefURL(base *url.URL, href string) (*url.URL, error) {
 	return base.ResolveReference(u), nil
 }
 
-func relativeURLPath(basePath, targetPath string) (string, error) {
-	baseNorm := normalizeURLPath(basePath)
-	targetNorm := normalizeURLPath(targetPath)
-
-	if !strings.HasPrefix(targetNorm, baseNorm) {
-		return "", fmt.Errorf("path %q is outside base %q", targetNorm, baseNorm)
-	}
-	rel := strings.TrimPrefix(targetNorm, baseNorm)
-	rel = strings.TrimPrefix(rel, "/")
-	return rel, nil
-}
-
 func normalizeURLPath(p string) string {
 	if p == "" {
 		return "/"
@@ -275,27 +247,4 @@ func normalizeURLPath(p string) string {
 		clean += "/"
 	}
 	return clean
-}
-
-func urlPathToFSPath(rel string) (string, error) {
-	rel = strings.TrimPrefix(rel, "/")
-	if rel == "" {
-		return "", nil
-	}
-	parts := strings.Split(rel, "/")
-	decoded := make([]string, 0, len(parts))
-	for _, part := range parts {
-		if part == "" {
-			continue
-		}
-		d, err := url.PathUnescape(part)
-		if err != nil {
-			return "", err
-		}
-		decoded = append(decoded, d)
-	}
-	if len(decoded) == 0 {
-		return "", nil
-	}
-	return filepath.Join(decoded...), nil
 }
