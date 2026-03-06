@@ -16,12 +16,12 @@ var listCommand = &cobra.Command{
 			return fmt.Errorf("no provider configured")
 		}
 
+		runtime := provider.NewJobRuntime(nil).WithURLFilters(urlFilters)
 		for i, p := range provider.Providers {
-			if !matchURLFilters(p.GetURL().String(), urlFilters) {
+			if !runtime.MatchProvider(p) {
 				continue
 			}
 			fmt.Printf("provider[%d]: %#v\n", i, p)
-			runtime := provider.NewJobRuntime(nil).WithURLFilters(urlFilters)
 			jobs, err := p.Jobs()
 			if err != nil {
 				return fmt.Errorf("provider %#v: %w", p, err)

@@ -87,6 +87,13 @@ func (r *JobRuntime) Match(job Job) bool {
 	return matchURLFilters(u, r.urlFilters)
 }
 
+func (r *JobRuntime) MatchProvider(p JobProvider) bool {
+	if len(r.urlFilters) == 0 {
+		return true
+	}
+	return matchURLFilters(p.GetURL().String(), r.urlFilters)
+}
+
 func matchURLFilters(u string, filters []string) bool {
 	for _, filter := range filters {
 		if strings.Contains(u, filter) {
@@ -98,6 +105,9 @@ func matchURLFilters(u string, filters []string) bool {
 
 func (r *JobRuntime) Run(ctx context.Context, destination string) error {
 	for _, provider := range r.providers {
+		if !r.MatchProvider(provider) {
+			continue
+		}
 		js, err := provider.Jobs()
 		if err != nil {
 			slog.Error("bad provider", "error", err)
