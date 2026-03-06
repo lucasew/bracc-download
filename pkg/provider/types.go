@@ -110,7 +110,8 @@ func (r *JobRuntime) Run(ctx context.Context, destination string) error {
 		}
 		js, err := provider.Jobs()
 		if err != nil {
-			slog.Error("bad provider", "error", err)
+			slog.Error("bad provider", "provider", provider, "error", err)
+			continue
 		}
 		for job := range js {
 			if !r.Match(job) {
