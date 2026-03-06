@@ -1,6 +1,7 @@
-package bracc
+package webdav
 
 import (
+	"bracc"
 	"bytes"
 	"context"
 	"encoding/xml"
@@ -47,8 +48,8 @@ func NewWebDAVJobProvider(rawURL string) (*WebDAVJobProvider, error) {
 	}, nil
 }
 
-func (p *WebDAVJobProvider) Jobs() (iter.Seq[Job], error) {
-	return func(yield func(Job) bool) {
+func (p *WebDAVJobProvider) Jobs() (iter.Seq[bracc.Job], error) {
+	return func(yield func(bracc.Job) bool) {
 		ctx := context.Background()
 		pending := []*url.URL{p.url}
 		seenCollections := map[string]struct{}{}

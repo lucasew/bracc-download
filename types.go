@@ -19,6 +19,8 @@ type Job interface {
 	Download(ctx context.Context, dir string) error
 }
 
+var Providers []JobProvider
+
 type JobRuntime struct {
 	providers []JobProvider
 }
