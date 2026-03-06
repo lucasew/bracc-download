@@ -1,6 +1,7 @@
 package portal_transparencia
 
 import (
+	"bracc/pkg/httpcontext"
 	"bracc/pkg/provider"
 	"bracc/pkg/provider/simple"
 	"fmt"
@@ -45,7 +46,6 @@ type Provider struct {
 	monthsBack        int
 	yearsBack         int
 	consecutiveMisses int
-	client            *http.Client
 }
 
 func init() {
@@ -77,7 +77,6 @@ func NewProvider(opts Options) (*Provider, error) {
 		monthsBack:        opts.MonthsBack,
 		yearsBack:         opts.YearsBack,
 		consecutiveMisses: opts.ConsecutiveMisses,
-		client:            http.DefaultClient,
 	}, nil
 }
 
@@ -85,8 +84,12 @@ func (p *Provider) GetURL() *url.URL {
 	return p.pageURL
 }
 
-func (p *Provider) Jobs() (iter.Seq[provider.Job], error) {
-	resp, err := p.client.Get(p.pageURL.String())
+func (p *Provider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.pageURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := httpcontext.Client(ctx).Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -104,11 +107,11 @@ func (p *Provider) Jobs() (iter.Seq[provider.Job], error) {
 		for _, dataset := range datasets {
 			switch dataset.Periodicity {
 			case PeriodicityMonthly:
-				if !p.generateMonthlyJobs(dataset, yield) {
+				if !p.generateMonthlyJobs(ctx, dataset, yield) {
 					return
 				}
 			case PeriodicityYearly:
-				if !p.generateYearlyJobs(dataset, yield) {
+				if !p.generateYearlyJobs(ctx, dataset, yield) {
 					return
 				}
 			default:
@@ -118,7 +121,7 @@ func (p *Provider) Jobs() (iter.Seq[provider.Job], error) {
 	}, nil
 }
 
-func (p *Provider) generateMonthlyJobs(dataset dataset, yield func(provider.Job) bool) bool {
+func (p *Provider) generateMonthlyJobs(ctx context.Context, dataset dataset, yield func(provider.Job) bool) bool {
 	now := time.Now().UTC()
 	misses := 0
 	foundAny := false
@@ -128,7 +131,7 @@ func (p *Provider) generateMonthlyJobs(dataset dataset, yield func(provider.Job)
 		u := *dataset.URL
 		u.Path = path.Join(dataset.URL.Path, d.Format("200601"))
 
-		ok := p.probe(&u)
+		ok := p.probe(ctx, &u)
 		if !ok {
 			if foundAny {
 				misses++
@@ -149,7 +152,7 @@ func (p *Provider) generateMonthlyJobs(dataset dataset, yield func(provider.Job)
 	return true
 }
 
-func (p *Provider) generateYearlyJobs(dataset dataset, yield func(provider.Job) bool) bool {
+func (p *Provider) generateYearlyJobs(ctx context.Context, dataset dataset, yield func(provider.Job) bool) bool {
 	now := time.Now().UTC()
 	misses := 0
 	foundAny := false
@@ -159,7 +162,7 @@ func (p *Provider) generateYearlyJobs(dataset dataset, yield func(provider.Job) 
 		u := *dataset.URL
 		u.Path = path.Join(dataset.URL.Path, fmt.Sprintf("%04d", year))
 
-		ok := p.probe(&u)
+		ok := p.probe(ctx, &u)
 		if !ok {
 			if foundAny {
 				misses++
@@ -180,10 +183,10 @@ func (p *Provider) generateYearlyJobs(dataset dataset, yield func(provider.Job) 
 	return true
 }
 
-func (p *Provider) probe(u *url.URL) bool {
+func (p *Provider) probe(ctx context.Context, u *url.URL) bool {
 	headReq, err := http.NewRequest(http.MethodHead, u.String(), nil)
 	if err == nil {
-		headResp, err := p.client.Do(headReq)
+		headResp, err := httpcontext.Client(ctx).Do(headReq.WithContext(ctx))
 		if err == nil {
 			slog.Debug("portal_transparencia probe", "method", http.MethodHead, "url", u.String(), "status", headResp.StatusCode)
 			headResp.Body.Close()
@@ -203,7 +206,7 @@ func (p *Provider) probe(u *url.URL) bool {
 		return false
 	}
 	getReq.Header.Set("Range", "bytes=0-0")
-	getResp, err := p.client.Do(getReq)
+	getResp, err := httpcontext.Client(ctx).Do(getReq.WithContext(ctx))
 	if err != nil {
 		slog.Debug("portal_transparencia probe error", "method", http.MethodGet, "url", u.String(), "error", err)
 		return false

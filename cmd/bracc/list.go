@@ -22,7 +22,7 @@ var listCommand = &cobra.Command{
 				continue
 			}
 			fmt.Printf("provider[%d]: %#v\n", i, p)
-			jobs, err := p.Jobs()
+			jobs, err := p.Jobs(cmd.Context())
 			if err != nil {
 				return fmt.Errorf("provider %#v: %w", p, err)
 			}

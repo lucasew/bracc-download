@@ -3,6 +3,7 @@ package cvm_processo_sancionador
 import (
 	"bracc/pkg/provider"
 	"bracc/pkg/provider/simple"
+	"context"
 	"iter"
 	"net/url"
 )
@@ -20,10 +21,10 @@ func (p *Provider) GetURL() *url.URL {
 	return u
 }
 
-func (p *Provider) Jobs() (iter.Seq[provider.Job], error) {
+func (p *Provider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
 	jobProvider, err := simple.NewSimpleJobProvider(zipURL)
 	if err != nil {
 		return nil, err
 	}
-	return jobProvider.Jobs()
+	return jobProvider.Jobs(ctx)
 }

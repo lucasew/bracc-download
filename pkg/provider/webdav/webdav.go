@@ -1,6 +1,7 @@
 package webdav
 
 import (
+	"bracc/pkg/httpcontext"
 	"bracc/pkg/provider"
 	"bracc/pkg/provider/simple"
 	"bytes"
@@ -26,8 +27,7 @@ const propfindBody = `<?xml version="1.0" encoding="utf-8" ?>
 </d:propfind>`
 
 type WebDAVJobProvider struct {
-	url    *url.URL
-	client *http.Client
+	url *url.URL
 }
 
 func (p *WebDAVJobProvider) GetURL() *url.URL {
@@ -46,14 +46,12 @@ func NewWebDAVJobProvider(rawURL string) (*WebDAVJobProvider, error) {
 		u.Path = "/"
 	}
 	return &WebDAVJobProvider{
-		url:    u,
-		client: http.DefaultClient,
+		url: u,
 	}, nil
 }
 
-func (p *WebDAVJobProvider) Jobs() (iter.Seq[provider.Job], error) {
+func (p *WebDAVJobProvider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
 	return func(yield func(provider.Job) bool) {
-		ctx := context.Background()
 		pending := []*url.URL{p.url}
 		seenCollections := map[string]struct{}{}
 
@@ -94,7 +92,7 @@ func (p *WebDAVJobProvider) list(ctx context.Context, collection *url.URL) ([]da
 	req.Header.Set("Depth", "1")
 	req.Header.Set("Content-Type", "application/xml; charset=utf-8")
 
-	resp, err := p.client.Do(req)
+	resp, err := httpcontext.Client(ctx).Do(req)
 	if err != nil {
 		return nil, err
 	}

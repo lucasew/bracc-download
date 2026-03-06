@@ -3,6 +3,7 @@ package eu_sanctions
 import (
 	"bracc/pkg/provider"
 	"bracc/pkg/provider/simple"
+	"context"
 	"iter"
 	"net/url"
 	"os"
@@ -23,7 +24,7 @@ func (p *Provider) GetURL() *url.URL {
 	return u
 }
 
-func (p *Provider) Jobs() (iter.Seq[provider.Job], error) {
+func (p *Provider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
 	token := strings.TrimSpace(os.Getenv("EU_SANCTIONS_TOKEN"))
 	if token == "" {
 		token = defaultToken
@@ -33,5 +34,5 @@ func (p *Provider) Jobs() (iter.Seq[provider.Job], error) {
 	if err != nil {
 		return nil, err
 	}
-	return jobProvider.Jobs()
+	return jobProvider.Jobs(ctx)
 }

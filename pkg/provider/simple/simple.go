@@ -1,6 +1,7 @@
 package simple
 
 import (
+	"bracc/pkg/httpcontext"
 	"bracc/pkg/provider"
 	"context"
 	"fmt"
@@ -30,7 +31,8 @@ func NewSimpleJobProvider(rawURL string) (*SimpleJobProvider, error) {
 	return &SimpleJobProvider{url: u}, nil
 }
 
-func (s *SimpleJobProvider) Jobs() (iter.Seq[provider.Job], error) {
+func (s *SimpleJobProvider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
+	_ = ctx
 	return func(yield func(j provider.Job) bool) {
 		yield(&SimpleJob{s.url})
 	}, nil
@@ -56,7 +58,7 @@ func (s *SimpleJob) Download(ctx context.Context, dir string) error {
 		return err
 	}
 	req = req.WithContext(ctx)
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := httpcontext.Client(ctx).Do(req)
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"fmt"
 	"os"
 
@@ -29,7 +28,7 @@ var downloadCommand = &cobra.Command{
 		}
 
 		runtime := provider.NewJobRuntime(provider.Providers).WithURLFilters(urlFilters)
-		ctx := provider.WithProgressFactory(context.Background(), progressFactory)
+		ctx := provider.WithProgressFactory(cmd.Context(), progressFactory)
 		return runtime.Run(ctx, destination)
 	},
 }

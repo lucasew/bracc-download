@@ -12,7 +12,7 @@ import (
 
 type JobProvider interface {
 	GetURL() *url.URL
-	Jobs() (iter.Seq[Job], error)
+	Jobs(ctx context.Context) (iter.Seq[Job], error)
 }
 
 type Job interface {
@@ -108,7 +108,7 @@ func (r *JobRuntime) Run(ctx context.Context, destination string) error {
 		if !r.MatchProvider(provider) {
 			continue
 		}
-		js, err := provider.Jobs()
+		js, err := provider.Jobs(ctx)
 		if err != nil {
 			slog.Error("bad provider", "provider", provider, "error", err)
 			continue

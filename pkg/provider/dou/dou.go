@@ -3,6 +3,7 @@ package dou
 import (
 	"bracc/pkg/provider"
 	"bracc/pkg/provider/simple"
+	"context"
 	"fmt"
 	"iter"
 	"net/url"
@@ -47,7 +48,8 @@ func NewDOUJobProvider(monthsBack int) (*DOUJobProvider, error) {
 	}, nil
 }
 
-func (p *DOUJobProvider) Jobs() (iter.Seq[provider.Job], error) {
+func (p *DOUJobProvider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
+	_ = ctx
 	now := time.Now().UTC()
 	// Monthly DOU dumps are not reliably available for the current open month.
 	// Start from the previous closed month and walk backwards.
