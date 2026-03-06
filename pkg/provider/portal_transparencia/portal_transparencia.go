@@ -5,6 +5,7 @@ import (
 	"bracc/pkg/provider"
 	"bracc/pkg/provider/simple"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"iter"
@@ -36,10 +37,10 @@ type dataset struct {
 }
 
 type arquivoEntry struct {
-	Ano    string
-	Mes    string
-	Dia    string
-	Origem string
+	Ano    string `json:"ano"`
+	Mes    string `json:"mes"`
+	Dia    string `json:"dia"`
+	Origem string `json:"origem"`
 }
 
 type Provider struct {
@@ -186,7 +187,7 @@ func parseDatasets(base *url.URL, body io.Reader) ([]dataset, error) {
 	return datasets, nil
 }
 
-var arquivoPushRE = regexp.MustCompile(`arquivos\.push\(\{"ano"\s*:\s*"([^"]*)",\s*"mes"\s*:\s*"([^"]*)",\s*"dia"\s*:\s*"([^"]*)",\s*"origem"\s*:\s*"([^"]*)"\}\);`)
+var arquivoPushRE = regexp.MustCompile(`arquivos\.push\((\{.*?\})\);`)
 
 func parseArquivoEntries(body io.Reader) ([]arquivoEntry, error) {
 	doc, err := goquery.NewDocumentFromReader(body)
@@ -197,14 +198,12 @@ func parseArquivoEntries(body io.Reader) ([]arquivoEntry, error) {
 	var entries []arquivoEntry
 	doc.Find("script").Each(func(_ int, script *goquery.Selection) {
 		for _, match := range arquivoPushRE.FindAllStringSubmatch(script.Text(), -1) {
-			if len(match) != 5 {
+			if len(match) != 2 {
 				continue
 			}
-			entry := arquivoEntry{
-				Ano:    match[1],
-				Mes:    match[2],
-				Dia:    match[3],
-				Origem: match[4],
+			var entry arquivoEntry
+			if err := json.Unmarshal([]byte(match[1]), &entry); err != nil {
+				continue
 			}
 			entries = append(entries, entry)
 		}
