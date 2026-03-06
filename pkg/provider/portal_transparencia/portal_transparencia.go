@@ -29,12 +29,6 @@ const (
 	PeriodicityYearly  Periodicity = "yearly"
 )
 
-type Options struct {
-	MonthsBack        int
-	YearsBack         int
-	ConsecutiveMisses int
-}
-
 type dataset struct {
 	URL         *url.URL
 	Slug        string
@@ -49,50 +43,31 @@ type arquivoEntry struct {
 }
 
 type Provider struct {
-	pageURL           *url.URL
-	monthsBack        int
-	yearsBack         int
-	consecutiveMisses int
 }
 
 func init() {
-	p, err := NewProvider(Options{})
+	p, err := NewProvider()
 	if err != nil {
 		panic(err)
 	}
 	provider.Providers = append(provider.Providers, p)
 }
 
-func NewProvider(opts Options) (*Provider, error) {
-	u, err := url.Parse(baseURL)
-	if err != nil {
+func NewProvider() (*Provider, error) {
+	if _, err := url.Parse(baseURL); err != nil {
 		return nil, fmt.Errorf("invalid base URL: %w", err)
 	}
-
-	if opts.MonthsBack <= 0 {
-		opts.MonthsBack = 60
-	}
-	if opts.YearsBack <= 0 {
-		opts.YearsBack = 10
-	}
-	if opts.ConsecutiveMisses <= 0 {
-		opts.ConsecutiveMisses = 6
-	}
-
-	return &Provider{
-		pageURL:           u,
-		monthsBack:        opts.MonthsBack,
-		yearsBack:         opts.YearsBack,
-		consecutiveMisses: opts.ConsecutiveMisses,
-	}, nil
+	return &Provider{}, nil
 }
 
 func (p *Provider) GetURL() *url.URL {
-	return p.pageURL
+	u, _ := url.Parse(baseURL)
+	return u
 }
 
 func (p *Provider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, p.pageURL.String(), nil)
+	base := p.GetURL()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -102,10 +77,10 @@ func (p *Provider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("unexpected HTTP status %d for %s", resp.StatusCode, p.pageURL)
+		return nil, fmt.Errorf("unexpected HTTP status %d for %s", resp.StatusCode, base)
 	}
 
-	datasets, err := parseDatasets(p.pageURL, resp.Body)
+	datasets, err := parseDatasets(base, resp.Body)
 	if err != nil {
 		return nil, err
 	}
