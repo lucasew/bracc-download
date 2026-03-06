@@ -53,6 +53,16 @@ type multibarProgressBar struct {
 	lastRendered time.Time
 }
 
+func (b *multibarProgressBar) SetName(name string) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if name == "" {
+		return
+	}
+	b.bar.Prepend = name
+	b.renderLocked(true)
+}
+
 func (b *multibarProgressBar) SetTotal(total int64) {
 	b.mu.Lock()
 	defer b.mu.Unlock()

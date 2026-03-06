@@ -23,6 +23,7 @@ type Job interface {
 var Providers []JobProvider
 
 type ProgressBar interface {
+	SetName(name string)
 	SetTotal(total int64)
 	SetCurrent(current int64)
 	Complete(err error)
@@ -37,6 +38,7 @@ type progressBarKey struct{}
 
 type nopProgressBar struct{}
 
+func (nopProgressBar) SetName(string)   {}
 func (nopProgressBar) SetTotal(int64)   {}
 func (nopProgressBar) SetCurrent(int64) {}
 func (nopProgressBar) Complete(error)   {}
@@ -55,6 +57,10 @@ func progressBarFromContext(ctx context.Context) ProgressBar {
 		return nopProgressBar{}
 	}
 	return bar
+}
+
+func ProgressBarFromContext(ctx context.Context) ProgressBar {
+	return progressBarFromContext(ctx)
 }
 
 func progressFactoryFromContext(ctx context.Context) ProgressFactory {

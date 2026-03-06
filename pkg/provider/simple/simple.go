@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -51,8 +52,6 @@ func (s *SimpleJob) GetURL() *url.URL {
 }
 
 func (s *SimpleJob) Download(ctx context.Context, dir string) error {
-	filename := filepath.Base(s.url.Path)
-	target := filepath.Join(dir, filename)
 	req, err := http.NewRequest(http.MethodGet, s.url.String(), nil)
 	if err != nil {
 		return err
@@ -66,6 +65,9 @@ func (s *SimpleJob) Download(ctx context.Context, dir string) error {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("unexpected HTTP status %d for %s", resp.StatusCode, s.url)
 	}
+	filename := filenameFromResponse(resp)
+	provider.ProgressBarFromContext(ctx).SetName(filename)
+	target := filepath.Join(dir, filename)
 
 	tmpPath := target + ".part"
 	f, err := os.Create(tmpPath)
@@ -83,4 +85,28 @@ func (s *SimpleJob) Download(ctx context.Context, dir string) error {
 		return closeErr
 	}
 	return os.Rename(tmpPath, target)
+}
+
+func filenameFromResponse(resp *http.Response) string {
+	filename := filepath.Base(resp.Request.URL.Path)
+	if filename == "." || filename == "/" || filename == "" {
+		filename = filepath.Base(resp.Request.URL.Host)
+	}
+
+	cd := resp.Header.Get("Content-Disposition")
+	if cd == "" {
+		return filename
+	}
+
+	_, params, err := mime.ParseMediaType(cd)
+	if err != nil {
+		return filename
+	}
+	if value := params["filename*"]; value != "" {
+		return value
+	}
+	if value := params["filename"]; value != "" {
+		return value
+	}
+	return filename
 }
