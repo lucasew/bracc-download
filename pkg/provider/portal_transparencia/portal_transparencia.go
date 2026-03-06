@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"path"
@@ -184,23 +185,31 @@ func (p *Provider) probe(u *url.URL) bool {
 	if err == nil {
 		headResp, err := p.client.Do(headReq)
 		if err == nil {
+			slog.Debug("portal_transparencia probe", "method", http.MethodHead, "url", u.String(), "status", headResp.StatusCode)
 			headResp.Body.Close()
 			if headResp.StatusCode >= 200 && headResp.StatusCode < 300 {
 				return true
 			}
+		} else {
+			slog.Debug("portal_transparencia probe error", "method", http.MethodHead, "url", u.String(), "error", err)
 		}
+	} else {
+		slog.Debug("portal_transparencia probe request error", "method", http.MethodHead, "url", u.String(), "error", err)
 	}
 
 	getReq, err := http.NewRequest(http.MethodGet, u.String(), nil)
 	if err != nil {
+		slog.Debug("portal_transparencia probe request error", "method", http.MethodGet, "url", u.String(), "error", err)
 		return false
 	}
 	getReq.Header.Set("Range", "bytes=0-0")
 	getResp, err := p.client.Do(getReq)
 	if err != nil {
+		slog.Debug("portal_transparencia probe error", "method", http.MethodGet, "url", u.String(), "error", err)
 		return false
 	}
 	defer getResp.Body.Close()
+	slog.Debug("portal_transparencia probe", "method", http.MethodGet, "url", u.String(), "status", getResp.StatusCode)
 	_, _ = io.Copy(io.Discard, io.LimitReader(getResp.Body, 1))
 	return getResp.StatusCode == http.StatusOK || getResp.StatusCode == http.StatusPartialContent
 }
