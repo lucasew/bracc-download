@@ -23,8 +23,14 @@ var downloadCommand = &cobra.Command{
 			return err
 		}
 
+		progressFactory, err := newMultibarFactory()
+		if err != nil {
+			return err
+		}
+
 		runtime := provider.NewJobRuntime(provider.Providers).WithURLFilters(urlFilters)
-		return runtime.Run(context.Background(), destination)
+		ctx := provider.WithProgressFactory(context.Background(), progressFactory)
+		return runtime.Run(ctx, destination)
 	},
 }
 
