@@ -47,11 +47,6 @@ func (s *SimpleJob) GetURL() *url.URL {
 func (s *SimpleJob) Download(ctx context.Context, dir string) error {
 	filename := filepath.Base(s.url.Path)
 	target := filepath.Join(dir, filename)
-	f, err := os.Create(target)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
 	req, err := http.NewRequest(http.MethodGet, s.url.String(), nil)
 	if err != nil {
 		return err
@@ -65,6 +60,21 @@ func (s *SimpleJob) Download(ctx context.Context, dir string) error {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("unexpected HTTP status %d for %s", resp.StatusCode, s.url)
 	}
-	_, err = provider.CopyWithProgress(ctx, s, f, resp.Body, resp.ContentLength)
-	return err
+
+	tmpPath := target + ".part"
+	f, err := os.Create(tmpPath)
+	if err != nil {
+		return err
+	}
+	_, copyErr := provider.CopyWithProgress(ctx, s, f, resp.Body, resp.ContentLength)
+	closeErr := f.Close()
+	if copyErr != nil {
+		_ = os.Remove(tmpPath)
+		return copyErr
+	}
+	if closeErr != nil {
+		_ = os.Remove(tmpPath)
+		return closeErr
+	}
+	return os.Rename(tmpPath, target)
 }
