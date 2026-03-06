@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"slices"
 	"strings"
 	"time"
 
@@ -219,14 +220,17 @@ func parseDatasets(base *url.URL, body io.Reader) ([]dataset, error) {
 			continue
 		}
 
-		cells := row.Find("td")
-		if cells.Length() == 0 {
-			continue
-		}
+		tds := row.Find("td").Children()
+		// o primeiro td tem o link relativo dentro
+		// o segundo tem a periodicidade
+		// completa a implementação
+		//
 
-		link, ok := row.Find("a[href]").First().Attr("href")
-		if !ok || strings.TrimSpace(link) == "" {
-			continue
+		periodicityType := detectPeriodicity(periodicity.Data)
+
+		linkURL, err := url.Parse(linkURL)
+		if err != nil {
+			slog.Error("Bad url found", linkURL)
 		}
 
 		u, err := base.Parse(link)
@@ -251,7 +255,7 @@ func parseDatasets(base *url.URL, body io.Reader) ([]dataset, error) {
 			Slug:        slug,
 			Periodicity: detectPeriodicity(rowText),
 		}
-		spew.Dump(d)
+		// spew.Dump(d)
 		datasets = append(datasets, d)
 		seen[slug] = struct{}{}
 	}
