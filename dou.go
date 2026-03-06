@@ -35,9 +35,12 @@ func NewDOUJobProvider(monthsBack int) (*DOUJobProvider, error) {
 
 func (p *DOUJobProvider) Jobs() (iter.Seq[Job], error) {
 	now := time.Now().UTC()
+	// Monthly DOU dumps are not reliably available for the current open month.
+	// Start from the previous closed month and walk backwards.
+	start := time.Date(now.Year(), now.Month()-1, 1, 0, 0, 0, 0, time.UTC)
 	return func(yield func(Job) bool) {
 		for offset := 0; offset < p.monthsBack; offset++ {
-			d := time.Date(now.Year(), now.Month()-time.Month(offset), 1, 0, 0, 0, 0, time.UTC)
+			d := time.Date(start.Year(), start.Month()-time.Month(offset), 1, 0, 0, 0, 0, time.UTC)
 			aamm := fmt.Sprintf("%02d%02d", d.Year()%100, int(d.Month()))
 
 			for _, section := range p.sections {
