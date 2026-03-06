@@ -40,10 +40,10 @@ func newListCommand() *cobra.Command {
 			}
 
 			for i, p := range provider.Providers {
-				fmt.Printf("provider[%d]: %v\n", i, p)
+				fmt.Printf("provider[%d]: %#v\n", i, p)
 				jobs, err := p.Jobs()
 				if err != nil {
-					return fmt.Errorf("provider %v: %w", p, err)
+					return fmt.Errorf("provider %#v: %w", p, err)
 				}
 				count := 0
 				for job := range jobs {
