@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 
 	"bracc/pkg/provider"
 	_ "bracc/prelude"
@@ -20,17 +21,21 @@ func main() {
 }
 
 func newRootCommand() *cobra.Command {
+	var urlFilters []string
+
 	root := &cobra.Command{
 		Use:   "bracc",
 		Short: "BRACC download utility",
 	}
 
-	root.AddCommand(newListCommand())
-	root.AddCommand(newDownloadCommand())
+	root.PersistentFlags().StringSliceVar(&urlFilters, "url-filter", nil, "Only include jobs whose URL contains one of these substrings")
+
+	root.AddCommand(newListCommand(&urlFilters))
+	root.AddCommand(newDownloadCommand(&urlFilters))
 	return root
 }
 
-func newListCommand() *cobra.Command {
+func newListCommand(urlFilters *[]string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "list",
 		Short: "List jobs grouped by provider",
@@ -40,13 +45,20 @@ func newListCommand() *cobra.Command {
 			}
 
 			for i, p := range provider.Providers {
+				if !matchURLFilters(p.GetURL().String(), *urlFilters) {
+					continue
+				}
 				fmt.Printf("provider[%d]: %#v\n", i, p)
+				runtime := provider.NewJobRuntime(nil).WithURLFilters(*urlFilters)
 				jobs, err := p.Jobs()
 				if err != nil {
 					return fmt.Errorf("provider %#v: %w", p, err)
 				}
 				count := 0
 				for job := range jobs {
+					if !runtime.Match(job) {
+						continue
+					}
 					count++
 					fmt.Printf("  - %s\n", job.GetURL().String())
 				}
@@ -59,7 +71,19 @@ func newListCommand() *cobra.Command {
 	}
 }
 
-func newDownloadCommand() *cobra.Command {
+func matchURLFilters(u string, filters []string) bool {
+	if len(filters) == 0 {
+		return true
+	}
+	for _, filter := range filters {
+		if strings.Contains(u, filter) {
+			return true
+		}
+	}
+	return false
+}
+
+func newDownloadCommand(urlFilters *[]string) *cobra.Command {
 	return &cobra.Command{
 		Use:   "download DESTINATION",
 		Short: "Download jobs from all configured providers",
@@ -73,7 +97,7 @@ func newDownloadCommand() *cobra.Command {
 				return err
 			}
 
-			runtime := provider.NewJobRuntime(provider.Providers)
+			runtime := provider.NewJobRuntime(provider.Providers).WithURLFilters(*urlFilters)
 			return runtime.Run(context.Background(), destination)
 		},
 	}

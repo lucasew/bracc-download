@@ -28,6 +28,10 @@ type DOUJobProvider struct {
 	sections   []int
 }
 
+func (p *DOUJobProvider) GetURL() *url.URL {
+	return p.baseURL
+}
+
 func NewDOUJobProvider(monthsBack int) (*DOUJobProvider, error) {
 	if monthsBack <= 0 {
 		return nil, fmt.Errorf("monthsBack must be > 0")

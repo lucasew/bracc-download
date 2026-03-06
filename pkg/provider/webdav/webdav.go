@@ -30,6 +30,10 @@ type WebDAVJobProvider struct {
 	client *http.Client
 }
 
+func (p *WebDAVJobProvider) GetURL() *url.URL {
+	return p.url
+}
+
 func NewWebDAVJobProvider(rawURL string) (*WebDAVJobProvider, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {

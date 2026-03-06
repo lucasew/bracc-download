@@ -15,6 +15,10 @@ type SimpleJobProvider struct {
 	url *url.URL
 }
 
+func (s *SimpleJobProvider) GetURL() *url.URL {
+	return s.url
+}
+
 func NewSimpleJobProvider(rawURL string) (*SimpleJobProvider, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {

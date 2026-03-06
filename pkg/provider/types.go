@@ -11,6 +11,7 @@ import (
 )
 
 type JobProvider interface {
+	GetURL() *url.URL
 	Jobs() (iter.Seq[Job], error)
 }
 
@@ -65,11 +66,34 @@ func progressFactoryFromContext(ctx context.Context) ProgressFactory {
 }
 
 type JobRuntime struct {
-	providers []JobProvider
+	providers  []JobProvider
+	urlFilters []string
 }
 
 func NewJobRuntime(providers []JobProvider) *JobRuntime {
-	return &JobRuntime{providers}
+	return &JobRuntime{providers: providers}
+}
+
+func (r *JobRuntime) WithURLFilters(filters []string) *JobRuntime {
+	r.urlFilters = append([]string(nil), filters...)
+	return r
+}
+
+func (r *JobRuntime) Match(job Job) bool {
+	if len(r.urlFilters) == 0 {
+		return true
+	}
+	u := job.GetURL().String()
+	return matchURLFilters(u, r.urlFilters)
+}
+
+func matchURLFilters(u string, filters []string) bool {
+	for _, filter := range filters {
+		if strings.Contains(u, filter) {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *JobRuntime) Run(ctx context.Context, destination string) error {
@@ -79,6 +103,9 @@ func (r *JobRuntime) Run(ctx context.Context, destination string) error {
 			slog.Error("bad provider", "error", err)
 		}
 		for job := range js {
+			if !r.Match(job) {
+				continue
+			}
 			u := job.GetURL()
 			download_dir := path.Join(destination, u.Host, strings.ReplaceAll(u.Path, "/", string(os.PathSeparator)), "_")
 			slog.Info("downloading", "url", u, "download_dir", download_dir, "job", job)
