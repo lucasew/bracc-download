@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bracc/pkg/httpcontext"
 	_ "bracc/prelude"
 	"log/slog"
 	"os"
@@ -22,6 +23,7 @@ var Command = &cobra.Command{
 		slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{
 			Level: level,
 		})))
+		cmd.SetContext(httpcontext.WithClient(cmd.Context(), httpcontext.NewClient("Mozilla/5.0 (X11; Linux x86_64; rv:147.0) Gecko/20100101 Firefox/147.0")))
 	},
 }
 

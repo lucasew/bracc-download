@@ -7,6 +7,29 @@ import (
 
 type clientKey struct{}
 
+type userAgentTransport struct {
+	base      http.RoundTripper
+	userAgent string
+}
+
+func (t userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	clone := req.Clone(req.Context())
+	if clone.Header.Get("User-Agent") == "" && t.userAgent != "" {
+		clone.Header.Set("User-Agent", t.userAgent)
+	}
+	return t.base.RoundTrip(clone)
+}
+
+func NewClient(userAgent string) *http.Client {
+	base := http.DefaultTransport
+	return &http.Client{
+		Transport: userAgentTransport{
+			base:      base,
+			userAgent: userAgent,
+		},
+	}
+}
+
 func WithClient(ctx context.Context, client *http.Client) context.Context {
 	if client == nil {
 		return ctx
