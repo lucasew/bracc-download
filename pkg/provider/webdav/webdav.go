@@ -161,7 +161,7 @@ func (j *WebDAVFileJob) Download(ctx context.Context, dir string) error {
 	if err != nil {
 		return err
 	}
-	_, copyErr := io.Copy(f, resp.Body)
+	_, copyErr := provider.CopyWithProgress(ctx, j, f, resp.Body, resp.ContentLength)
 	closeErr := f.Close()
 	if copyErr != nil {
 		_ = os.Remove(tmpPath)

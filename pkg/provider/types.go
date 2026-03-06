@@ -36,9 +36,9 @@ type progressBarKey struct{}
 
 type nopProgressBar struct{}
 
-func (nopProgressBar) SetTotal(int64)    {}
-func (nopProgressBar) SetCurrent(int64)  {}
-func (nopProgressBar) Complete(error)    {}
+func (nopProgressBar) SetTotal(int64)   {}
+func (nopProgressBar) SetCurrent(int64) {}
+func (nopProgressBar) Complete(error)   {}
 
 func WithProgressFactory(ctx context.Context, factory ProgressFactory) context.Context {
 	return context.WithValue(ctx, progressFactoryKey{}, factory)
@@ -82,7 +82,7 @@ func (r *JobRuntime) Run(ctx context.Context, destination string) error {
 			u := job.GetURL()
 			download_dir := path.Join(destination, u.Host, strings.ReplaceAll(u.Path, "/", string(os.PathSeparator)), "_")
 			slog.Info("downloading", "url", u, "download_dir", download_dir, "job", job)
-			bar := nopProgressBar{}
+			var bar ProgressBar = nopProgressBar{}
 			jobCtx := ctx
 			if factory := progressFactoryFromContext(ctx); factory != nil {
 				bar = factory.NewBar(job)

@@ -4,7 +4,6 @@ import (
 	"bracc/pkg/provider"
 	"context"
 	"fmt"
-	"io"
 	"iter"
 	"net/http"
 	"net/url"
@@ -66,6 +65,6 @@ func (s *SimpleJob) Download(ctx context.Context, dir string) error {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("unexpected HTTP status %d for %s", resp.StatusCode, s.url)
 	}
-	_, err = io.Copy(f, resp.Body)
+	_, err = provider.CopyWithProgress(ctx, s, f, resp.Body, resp.ContentLength)
 	return err
 }
