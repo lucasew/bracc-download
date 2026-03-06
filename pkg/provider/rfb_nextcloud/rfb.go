@@ -1,16 +1,16 @@
 package rfb_nextcloud
 
 import (
-	"bracc"
-	"bracc/webdav"
+	"bracc/pkg/provider"
+	"bracc/pkg/provider/webdav"
 )
 
 func init() {
-	provider, err := NewProvider()
+	p, err := NewProvider()
 	if err != nil {
 		panic(err)
 	}
-	bracc.Providers = append(bracc.Providers, provider)
+	provider.Providers = append(provider.Providers, p)
 }
 
 func NewProvider() (*webdav.WebDAVJobProvider, error) {

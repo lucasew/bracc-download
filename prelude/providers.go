@@ -1,6 +1,6 @@
 package prelude
 
 import (
-	_ "bracc/dou"
-	_ "bracc/rfb_nextcloud"
+	_ "bracc/pkg/provider/dou"
+	_ "bracc/pkg/provider/rfb_nextcloud"
 )

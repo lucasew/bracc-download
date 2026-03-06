@@ -6,8 +6,8 @@ import (
 	"log/slog"
 	"os"
 
-	"bracc"
-	"bracc/prelude"
+	"bracc/pkg/provider"
+	_ "bracc/prelude"
 
 	"github.com/spf13/cobra"
 )
@@ -35,11 +35,11 @@ func newListCommand() *cobra.Command {
 		Use:   "list",
 		Short: "List jobs grouped by provider",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(bracc.Providers) == 0 {
+			if len(provider.Providers) == 0 {
 				return fmt.Errorf("no provider configured")
 			}
 
-			for i, p := range bracc.Providers {
+			for i, p := range provider.Providers {
 				fmt.Printf("provider[%d]: %v\n", i, p)
 				jobs, err := p.Jobs()
 				if err != nil {
@@ -65,7 +65,7 @@ func newDownloadCommand() *cobra.Command {
 		Short: "Download jobs from all configured providers",
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if len(bracc.Providers) == 0 {
+			if len(provider.Providers) == 0 {
 				return fmt.Errorf("no provider configured")
 			}
 			destination := args[0]
@@ -73,8 +73,7 @@ func newDownloadCommand() *cobra.Command {
 				return err
 			}
 
-			_ = prelude.Providers
-			runtime := bracc.NewJobRuntime(bracc.Providers)
+			runtime := provider.NewJobRuntime(provider.Providers)
 			return runtime.Run(context.Background(), destination)
 		},
 	}

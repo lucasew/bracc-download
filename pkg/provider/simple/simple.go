@@ -1,7 +1,7 @@
 package simple
 
 import (
-	"bracc"
+	"bracc/pkg/provider"
 	"context"
 	"fmt"
 	"io"
@@ -27,8 +27,8 @@ func NewSimpleJobProvider(rawURL string) (*SimpleJobProvider, error) {
 	return &SimpleJobProvider{url: u}, nil
 }
 
-func (s *SimpleJobProvider) Jobs() (iter.Seq[bracc.Job], error) {
-	return func(yield func(j bracc.Job) bool) {
+func (s *SimpleJobProvider) Jobs() (iter.Seq[provider.Job], error) {
+	return func(yield func(j provider.Job) bool) {
 		yield(&SimpleJob{s.url})
 	}, nil
 }

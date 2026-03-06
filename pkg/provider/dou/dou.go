@@ -1,8 +1,8 @@
 package dou
 
 import (
-	"bracc"
-	"bracc/simple"
+	"bracc/pkg/provider"
+	"bracc/pkg/provider/simple"
 	"fmt"
 	"iter"
 	"net/url"
@@ -15,11 +15,11 @@ const (
 )
 
 func init() {
-	provider, err := NewDOUJobProvider(24)
+	p, err := NewDOUJobProvider(24)
 	if err != nil {
 		panic(err)
 	}
-	bracc.Providers = append(bracc.Providers, provider)
+	provider.Providers = append(provider.Providers, p)
 }
 
 type DOUJobProvider struct {
@@ -43,12 +43,12 @@ func NewDOUJobProvider(monthsBack int) (*DOUJobProvider, error) {
 	}, nil
 }
 
-func (p *DOUJobProvider) Jobs() (iter.Seq[bracc.Job], error) {
+func (p *DOUJobProvider) Jobs() (iter.Seq[provider.Job], error) {
 	now := time.Now().UTC()
 	// Monthly DOU dumps are not reliably available for the current open month.
 	// Start from the previous closed month and walk backwards.
 	start := time.Date(now.Year(), now.Month()-1, 1, 0, 0, 0, 0, time.UTC)
-	return func(yield func(bracc.Job) bool) {
+	return func(yield func(provider.Job) bool) {
 		for offset := 0; offset < p.monthsBack; offset++ {
 			d := time.Date(start.Year(), start.Month()-time.Month(offset), 1, 0, 0, 0, 0, time.UTC)
 			aamm := fmt.Sprintf("%02d%02d", d.Year()%100, int(d.Month()))
