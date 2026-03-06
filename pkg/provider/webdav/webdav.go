@@ -2,6 +2,7 @@ package webdav
 
 import (
 	"bracc/pkg/provider"
+	"bracc/pkg/provider/simple"
 	"bytes"
 	"context"
 	"encoding/xml"
@@ -12,9 +13,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/url"
-	"os"
 	"path"
-	"path/filepath"
 	"strings"
 )
 
@@ -75,10 +74,7 @@ func (p *WebDAVJobProvider) Jobs() (iter.Seq[provider.Job], error) {
 					pending = append(pending, entry.URL)
 					continue
 				}
-				if !yield(&WebDAVFileJob{
-					url:    entry.URL,
-					client: p.client,
-				}) {
+				if !yield(simple.NewJob(*entry.URL)) {
 					return
 				}
 			}
@@ -125,65 +121,6 @@ func (p *WebDAVJobProvider) list(ctx context.Context, collection *url.URL) ([]da
 	}
 
 	return items, nil
-}
-
-type WebDAVFileJob struct {
-	url    *url.URL
-	client *http.Client
-}
-
-func (j *WebDAVFileJob) GetURL() *url.URL {
-	return j.url
-}
-
-func (j *WebDAVFileJob) Download(ctx context.Context, dir string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, j.url.String(), nil)
-	if err != nil {
-		return err
-	}
-
-	resp, err := j.client.Do(req)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
-		return fmt.Errorf("GET %s failed: status=%d body=%q", j.url, resp.StatusCode, string(b))
-	}
-
-	filename := fileNameFromURLPath(j.url.Path)
-	tmpPath := filepath.Join(dir, filename+".part")
-	finalPath := filepath.Join(dir, filename)
-
-	f, err := os.Create(tmpPath)
-	if err != nil {
-		return err
-	}
-	_, copyErr := provider.CopyWithProgress(ctx, j, f, resp.Body, resp.ContentLength)
-	closeErr := f.Close()
-	if copyErr != nil {
-		_ = os.Remove(tmpPath)
-		return copyErr
-	}
-	if closeErr != nil {
-		_ = os.Remove(tmpPath)
-		return closeErr
-	}
-	return os.Rename(tmpPath, finalPath)
-}
-
-func fileNameFromURLPath(p string) string {
-	base := path.Base(p)
-	if base == "." || base == "/" || base == "" {
-		return "downloaded_file"
-	}
-	decoded, err := url.PathUnescape(base)
-	if err != nil || decoded == "" {
-		return base
-	}
-	return decoded
 }
 
 type davEntry struct {
