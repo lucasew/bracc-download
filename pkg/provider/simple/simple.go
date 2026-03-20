@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 	"iter"
+	"log/slog"
 	"mime"
 	"net/http"
 	"net/url"
@@ -61,7 +62,11 @@ func (s *SimpleJob) Download(ctx context.Context, dir string) error {
 	if err != nil {
 		return err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			slog.Error("failed to close response body", "error", err)
+		}
+	}()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("unexpected HTTP status %d for %s", resp.StatusCode, s.url)
 	}

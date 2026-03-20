@@ -96,7 +96,11 @@ func (p *WebDAVJobProvider) list(ctx context.Context, collection *url.URL) ([]da
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			slog.Error("failed to close response body", "error", err)
+		}
+	}()
 
 	if resp.StatusCode != http.StatusMultiStatus {
 		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))

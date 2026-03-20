@@ -1,0 +1,1 @@
+- 2026-03-20: Explicitly capture and log errors returned by deferred Close() calls instead of ignoring them.

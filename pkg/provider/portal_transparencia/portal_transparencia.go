@@ -76,7 +76,11 @@ func (p *Provider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			slog.Error("failed to close response body", "error", err)
+		}
+	}()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("unexpected HTTP status %d for %s", resp.StatusCode, base)
 	}
@@ -111,7 +115,11 @@ func (p *Provider) datasetJobs(ctx context.Context, dataset dataset) ([]provider
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if err := resp.Body.Close(); err != nil {
+			slog.Error("failed to close response body", "error", err)
+		}
+	}()
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("unexpected HTTP status %d for %s", resp.StatusCode, dataset.URL)
 	}
