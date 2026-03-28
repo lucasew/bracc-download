@@ -1,0 +1,1 @@
+- 2025-03-28: [High] Path traversal via unsanitized Content-Disposition filenames. Spot it by checking how downloaded file names are constructed from headers without filepath.Base() sanitization.

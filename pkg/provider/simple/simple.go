@@ -95,18 +95,18 @@ func filenameFromResponse(resp *http.Response) string {
 
 	cd := resp.Header.Get("Content-Disposition")
 	if cd == "" {
-		return filename
+		return filepath.Base(filename)
 	}
 
 	_, params, err := mime.ParseMediaType(cd)
 	if err != nil {
-		return filename
+		return filepath.Base(filename)
 	}
 	if value := params["filename*"]; value != "" {
-		return value
+		return filepath.Base(value)
 	}
 	if value := params["filename"]; value != "" {
-		return value
+		return filepath.Base(value)
 	}
-	return filename
+	return filepath.Base(filename)
 }
