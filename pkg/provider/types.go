@@ -10,11 +10,17 @@ import (
 	"strings"
 )
 
+// JobProvider represents a data source that can yield a sequence of jobs.
+// It acts as a conceptual root for a specific domain (e.g., a specific
+// government portal) and enumerates available sub-datasets or files to download.
 type JobProvider interface {
 	GetURL() *url.URL
 	Jobs(ctx context.Context) (iter.Seq[Job], error)
 }
 
+// Job represents an individual file or resource to be downloaded.
+// It encapsulates the specific download logic for the resource, managing
+// its own HTTP requests and saving state into the provided destination directory.
 type Job interface {
 	GetURL() *url.URL
 	Download(ctx context.Context, dir string) error
@@ -22,6 +28,9 @@ type Job interface {
 
 var Providers []JobProvider
 
+// ProgressBar abstracts the CLI progress reporting mechanism.
+// It allows the orchestration layer to track download progression (bytes written)
+// without coupling the domain logic to a specific rendering library (like mpb).
 type ProgressBar interface {
 	SetName(name string)
 	SetTotal(total int64)
@@ -29,6 +38,7 @@ type ProgressBar interface {
 	Complete(err error)
 }
 
+// ProgressFactory spawns individual ProgressBar instances for concurrent or sequential jobs.
 type ProgressFactory interface {
 	NewBar(job Job) ProgressBar
 }
@@ -71,6 +81,10 @@ func progressFactoryFromContext(ctx context.Context) ProgressFactory {
 	return factory
 }
 
+// JobRuntime orchestrates the execution of configured JobProviders.
+// It handles global concerns like provider matching, URL filtering,
+// and injecting the context-bound progress bars before triggering downloads.
+// It skips providers and individual jobs that do not match the specified URL filters.
 type JobRuntime struct {
 	providers  []JobProvider
 	urlFilters []string

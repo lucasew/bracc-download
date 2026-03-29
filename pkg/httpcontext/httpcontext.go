@@ -20,6 +20,8 @@ func (t userAgentTransport) RoundTrip(req *http.Request) (*http.Response, error)
 	return t.base.RoundTrip(clone)
 }
 
+// NewClient instantiates a standard HTTP Client configured with a custom
+// RoundTripper which injects a default User-Agent on all outgoing requests.
 func NewClient(userAgent string) *http.Client {
 	base := http.DefaultTransport
 	return &http.Client{
@@ -30,6 +32,9 @@ func NewClient(userAgent string) *http.Client {
 	}
 }
 
+// WithClient returns a child context populated with an active http.Client.
+// Used at entrypoint to make custom HTTP configurations (like User-Agent interception)
+// available to the downstream provider logic.
 func WithClient(ctx context.Context, client *http.Client) context.Context {
 	if client == nil {
 		return ctx
@@ -37,6 +42,9 @@ func WithClient(ctx context.Context, client *http.Client) context.Context {
 	return context.WithValue(ctx, clientKey{}, client)
 }
 
+// Client attempts to extract an http.Client embedded within the request context.
+// If no specific HTTP client configuration was injected via WithClient,
+// it gracefully defaults to the standard http.DefaultClient.
 func Client(ctx context.Context) *http.Client {
 	client, ok := ctx.Value(clientKey{}).(*http.Client)
 	if !ok || client == nil {
