@@ -1,0 +1,1 @@
+- 2024-04-01: [Directory permissions should be 0755 or less (Gosec G301), restrict os.MkdirAll to prevent permissive 0777 creation]

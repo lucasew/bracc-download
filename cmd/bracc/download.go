@@ -18,7 +18,7 @@ var downloadCommand = &cobra.Command{
 			return fmt.Errorf("no provider configured")
 		}
 		destination := args[0]
-		if err := os.MkdirAll(destination, os.ModePerm); err != nil {
+		if err := os.MkdirAll(destination, 0755); err != nil {
 			return err
 		}
 

@@ -132,7 +132,7 @@ func (r *JobRuntime) Run(ctx context.Context, destination string) error {
 				bar = factory.NewBar(job)
 				jobCtx = WithProgressBar(ctx, bar)
 			}
-			if err := os.MkdirAll(download_dir, os.ModePerm); err != nil {
+			if err := os.MkdirAll(download_dir, 0755); err != nil {
 				return err
 			}
 			if err := job.Download(jobCtx, download_dir); err != nil {

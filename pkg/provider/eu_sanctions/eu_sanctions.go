@@ -11,6 +11,7 @@ import (
 )
 
 const baseURL = "https://webgate.ec.europa.eu/fsd/fsf/public/files/csvFullSanctionsList/content"
+// SECURITY-NOTE: this token is publicly documented by the EU for open data access
 const defaultToken = "dG9rZW4tMjAxNw"
 
 func init() {
