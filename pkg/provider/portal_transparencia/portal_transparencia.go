@@ -21,6 +21,7 @@ import (
 
 const baseURL = "https://portaldatransparencia.gov.br/download-de-dados"
 
+// Periodicity dictates how frequently a dataset updates, determining how its download URL keys are constructed.
 type Periodicity string
 
 const (
@@ -30,12 +31,14 @@ const (
 	PeriodicityYearly  Periodicity = "yearly"
 )
 
+// dataset represents a scraped dataset category from the portal, grouping its endpoint, slug, and expected update frequency.
 type dataset struct {
 	URL         *url.URL
 	Slug        string
 	Periodicity Periodicity
 }
 
+// arquivoEntry mirrors the structure of the JSON objects pushed to `arquivos` arrays within inline scripts on dataset pages.
 type arquivoEntry struct {
 	Ano    string `json:"ano"`
 	Mes    string `json:"mes"`
@@ -43,6 +46,7 @@ type arquivoEntry struct {
 	Origem string `json:"origem"`
 }
 
+// Provider implements the JobProvider interface for 'Portal da Transparência', orchestrating HTML parsing to discover files dynamically.
 type Provider struct {
 }
 
@@ -54,6 +58,7 @@ func init() {
 	provider.Providers = append(provider.Providers, p)
 }
 
+// NewProvider initializes the provider, ensuring the hardcoded baseURL is structurally valid before use.
 func NewProvider() (*Provider, error) {
 	if _, err := url.Parse(baseURL); err != nil {
 		return nil, fmt.Errorf("invalid base URL: %w", err)
@@ -61,11 +66,13 @@ func NewProvider() (*Provider, error) {
 	return &Provider{}, nil
 }
 
+// GetURL returns the root download URL from which all scraping begins.
 func (p *Provider) GetURL() *url.URL {
 	u, _ := url.Parse(baseURL)
 	return u
 }
 
+// Jobs walks the base URL to collect datasets, then queries each dataset's page to yield discrete downloadable file Jobs.
 func (p *Provider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
 	base := p.GetURL()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base.String(), nil)
@@ -102,6 +109,7 @@ func (p *Provider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
 	}, nil
 }
 
+// datasetJobs queries an individual dataset's endpoint, scraping the inline Javascript to construct download endpoints for each entry.
 func (p *Provider) datasetJobs(ctx context.Context, dataset dataset) ([]provider.Job, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, dataset.URL.String(), nil)
 	if err != nil {
@@ -134,6 +142,7 @@ func (p *Provider) datasetJobs(ctx context.Context, dataset dataset) ([]provider
 	return jobs, nil
 }
 
+// parseDatasets reads the HTML body of the root dataset page, hunting for anchor links inside table rows while deduplicating by slug.
 func parseDatasets(base *url.URL, body io.Reader) ([]dataset, error) {
 	doc, err := goquery.NewDocumentFromReader(body)
 	if err != nil {
@@ -189,6 +198,7 @@ func parseDatasets(base *url.URL, body io.Reader) ([]dataset, error) {
 
 var arquivoPushRE = regexp.MustCompile(`arquivos\.push\((\{.*?\})\);`)
 
+// parseArquivoEntries hunts for `<script>` blocks within a dataset page, extracting Javascript object payloads into native structs using a RegExp pattern.
 func parseArquivoEntries(body io.Reader) ([]arquivoEntry, error) {
 	doc, err := goquery.NewDocumentFromReader(body)
 	if err != nil {
@@ -211,6 +221,7 @@ func parseArquivoEntries(body io.Reader) ([]arquivoEntry, error) {
 	return entries, nil
 }
 
+// datasetKey synthesizes the download file path suffix based on how frequently the source data is cut (e.g. appending YYYYMM for monthly data).
 func datasetKey(periodicity Periodicity, entry arquivoEntry) (string, bool) {
 	switch periodicity {
 	case PeriodicityMonthly:
@@ -228,6 +239,7 @@ func datasetKey(periodicity Periodicity, entry arquivoEntry) (string, bool) {
 	}
 }
 
+// detectPeriodicity infers the temporal distribution of a dataset by mapping scraped text keywords to defined enum constants.
 func detectPeriodicity(s string) Periodicity {
 	s = normalizeText(s)
 	switch {
