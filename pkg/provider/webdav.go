@@ -1,9 +1,7 @@
-package webdav
+package provider
 
 import (
 	"bracc/pkg/httpcontext"
-	"bracc/pkg/provider"
-	"bracc/pkg/provider/simple"
 	"bytes"
 	"context"
 	"encoding/xml"
@@ -18,13 +16,15 @@ import (
 	"strings"
 )
 
-const propfindBody = `<?xml version="1.0" encoding="utf-8" ?>
+const (
+	propfindBody = `<?xml version="1.0" encoding="utf-8" ?>
 <d:propfind xmlns:d="DAV:">
   <d:prop>
     <d:resourcetype/>
     <d:getcontentlength/>
   </d:prop>
 </d:propfind>`
+)
 
 type WebDAVJobProvider struct {
 	url *url.URL
@@ -50,8 +50,8 @@ func NewWebDAVJobProvider(rawURL string) (*WebDAVJobProvider, error) {
 	}, nil
 }
 
-func (p *WebDAVJobProvider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
-	return func(yield func(provider.Job) bool) {
+func (p *WebDAVJobProvider) Jobs(ctx context.Context) (iter.Seq[Job], error) {
+	return func(yield func(Job) bool) {
 		pending := []*url.URL{p.url}
 		seenCollections := map[string]struct{}{}
 
@@ -76,7 +76,7 @@ func (p *WebDAVJobProvider) Jobs(ctx context.Context) (iter.Seq[provider.Job], e
 					pending = append(pending, entry.URL)
 					continue
 				}
-				if !yield(simple.NewJob(*entry.URL)) {
+				if !yield(NewJob(*entry.URL)) {
 					return
 				}
 			}
@@ -98,8 +98,10 @@ func (p *WebDAVJobProvider) list(ctx context.Context, collection *url.URL) ([]da
 	}
 	defer resp.Body.Close()
 
+	const maxErrorBodySize = 2048
+
 	if resp.StatusCode != http.StatusMultiStatus {
-		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, maxErrorBodySize))
 		return nil, fmt.Errorf("PROPFIND %s failed: status=%d body=%q", collection, resp.StatusCode, string(b))
 	}
 

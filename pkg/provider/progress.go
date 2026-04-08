@@ -5,13 +5,15 @@ import (
 	"io"
 )
 
+const defaultBufferSize = 128 * 1024
+
 func CopyWithProgress(ctx context.Context, job Job, dst io.Writer, src io.Reader, total int64) (int64, error) {
 	bar := progressBarFromContext(ctx)
 	if total > 0 {
 		bar.SetTotal(total)
 	}
 
-	buf := make([]byte, 128*1024)
+	buf := make([]byte, defaultBufferSize)
 	var downloaded int64
 	_ = job
 

@@ -1,8 +1,7 @@
-package simple
+package provider
 
 import (
 	"bracc/pkg/httpcontext"
-	"bracc/pkg/provider"
 	"context"
 	"fmt"
 	"iter"
@@ -32,9 +31,9 @@ func NewSimpleJobProvider(rawURL string) (*SimpleJobProvider, error) {
 	return &SimpleJobProvider{url: u}, nil
 }
 
-func (s *SimpleJobProvider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
+func (s *SimpleJobProvider) Jobs(ctx context.Context) (iter.Seq[Job], error) {
 	_ = ctx
-	return func(yield func(j provider.Job) bool) {
+	return func(yield func(j Job) bool) {
 		yield(&SimpleJob{s.url})
 	}, nil
 }
@@ -66,15 +65,19 @@ func (s *SimpleJob) Download(ctx context.Context, dir string) error {
 		return fmt.Errorf("unexpected HTTP status %d for %s", resp.StatusCode, s.url)
 	}
 	filename := filenameFromResponse(resp)
-	provider.ProgressBarFromContext(ctx).SetName(filename)
+	ProgressBarFromContext(ctx).SetName(filename)
 	target := filepath.Join(dir, filename)
 
+	return downloadFileAtomically(ctx, s, resp, target)
+}
+
+func downloadFileAtomically(ctx context.Context, s *SimpleJob, resp *http.Response, target string) error {
 	tmpPath := target + ".part"
 	f, err := os.Create(tmpPath)
 	if err != nil {
 		return err
 	}
-	_, copyErr := provider.CopyWithProgress(ctx, s, f, resp.Body, resp.ContentLength)
+	_, copyErr := CopyWithProgress(ctx, s, f, resp.Body, resp.ContentLength)
 	closeErr := f.Close()
 	if copyErr != nil {
 		_ = os.Remove(tmpPath)

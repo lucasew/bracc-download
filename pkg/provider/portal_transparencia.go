@@ -1,9 +1,7 @@
-package portal_transparencia
+package provider
 
 import (
 	"bracc/pkg/httpcontext"
-	"bracc/pkg/provider"
-	"bracc/pkg/provider/simple"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -19,7 +17,7 @@ import (
 	"github.com/PuerkitoBio/goquery"
 )
 
-const baseURL = "https://portaldatransparencia.gov.br/download-de-dados"
+const portalTransparenciaBaseURL = "https://portaldatransparencia.gov.br/download-de-dados"
 
 type Periodicity string
 
@@ -43,30 +41,30 @@ type arquivoEntry struct {
 	Origem string `json:"origem"`
 }
 
-type Provider struct {
+type PortalTransparenciaProvider struct {
 }
 
 func init() {
-	p, err := NewProvider()
+	p, err := NewPortalTransparenciaProvider()
 	if err != nil {
 		panic(err)
 	}
-	provider.Providers = append(provider.Providers, p)
+	Providers = append(Providers, p)
 }
 
-func NewProvider() (*Provider, error) {
-	if _, err := url.Parse(baseURL); err != nil {
+func NewPortalTransparenciaProvider() (*PortalTransparenciaProvider, error) {
+	if _, err := url.Parse(portalTransparenciaBaseURL); err != nil {
 		return nil, fmt.Errorf("invalid base URL: %w", err)
 	}
-	return &Provider{}, nil
+	return &PortalTransparenciaProvider{}, nil
 }
 
-func (p *Provider) GetURL() *url.URL {
-	u, _ := url.Parse(baseURL)
+func (p *PortalTransparenciaProvider) GetURL() *url.URL {
+	u, _ := url.Parse(portalTransparenciaBaseURL)
 	return u
 }
 
-func (p *Provider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
+func (p *PortalTransparenciaProvider) Jobs(ctx context.Context) (iter.Seq[Job], error) {
 	base := p.GetURL()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base.String(), nil)
 	if err != nil {
@@ -86,7 +84,7 @@ func (p *Provider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
 		return nil, err
 	}
 
-	return func(yield func(provider.Job) bool) {
+	return func(yield func(Job) bool) {
 		for _, dataset := range datasets {
 			jobs, err := p.datasetJobs(ctx, dataset)
 			if err != nil {
@@ -102,7 +100,7 @@ func (p *Provider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
 	}, nil
 }
 
-func (p *Provider) datasetJobs(ctx context.Context, dataset dataset) ([]provider.Job, error) {
+func (p *PortalTransparenciaProvider) datasetJobs(ctx context.Context, dataset dataset) ([]Job, error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, dataset.URL.String(), nil)
 	if err != nil {
 		return nil, err
@@ -121,7 +119,7 @@ func (p *Provider) datasetJobs(ctx context.Context, dataset dataset) ([]provider
 		return nil, err
 	}
 
-	jobs := make([]provider.Job, 0, len(entries))
+	jobs := make([]Job, 0, len(entries))
 	for _, entry := range entries {
 		key, ok := datasetKey(dataset.Periodicity, entry)
 		if !ok {
@@ -129,7 +127,7 @@ func (p *Provider) datasetJobs(ctx context.Context, dataset dataset) ([]provider
 		}
 		u := *dataset.URL
 		u.Path = path.Join(dataset.URL.Path, key)
-		jobs = append(jobs, simple.NewJob(u))
+		jobs = append(jobs, NewJob(u))
 	}
 	return jobs, nil
 }
