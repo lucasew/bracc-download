@@ -1,0 +1,67 @@
+name: autorelease
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install mise
+        uses: jdx/mise-action@v2
+        with:
+          version: 2024.1.1 # Pinned version
+          install: false
+
+      - name: Install tools
+        run: mise install
+
+      - name: Install dependencies
+        run: mise run install
+
+      - name: Run codegen
+        run: mise run codegen
+
+      - name: Create PR if codegen changed files
+        run: |
+          if [[ -n $(git status -s) ]]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "github-actions[bot]@users.noreply.github.com"
+            git checkout -b chore/codegen-update
+            git add .
+            git commit -m "🤖 Update generated code"
+            git push -f origin chore/codegen-update
+            gh pr create --title "🤖 Codegen Update" --body "Automated codegen update" --base main --head chore/codegen-update || true
+            git checkout -
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Run CI
+        run: mise run ci
+
+      - name: Release
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v$(date +%Y%m%d%H%M%S)"
+          gh release create "$TAG" --title "$TAG" --notes "Automated release" --generate-notes
+
+      - name: Upload Artifacts
+        if: github.event_name == 'workflow_dispatch' || github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: |
+            README.md
