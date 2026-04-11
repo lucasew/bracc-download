@@ -13,14 +13,19 @@ import (
 	"path/filepath"
 )
 
+// SimpleJobProvider is a static, single-URL provider.
+// It generates exactly one job pointing to the configured absolute URL.
 type SimpleJobProvider struct {
 	url *url.URL
 }
 
+// GetURL returns the absolute URL configured for this provider.
 func (s *SimpleJobProvider) GetURL() *url.URL {
 	return s.url
 }
 
+// NewSimpleJobProvider initializes a SimpleJobProvider with the given raw URL.
+// It validates that the URL is absolute (has both scheme and host).
 func NewSimpleJobProvider(rawURL string) (*SimpleJobProvider, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
@@ -32,6 +37,7 @@ func NewSimpleJobProvider(rawURL string) (*SimpleJobProvider, error) {
 	return &SimpleJobProvider{url: u}, nil
 }
 
+// Jobs returns an iterator containing exactly one SimpleJob for the configured URL.
 func (s *SimpleJobProvider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
 	_ = ctx
 	return func(yield func(j provider.Job) bool) {
@@ -39,18 +45,26 @@ func (s *SimpleJobProvider) Jobs(ctx context.Context) (iter.Seq[provider.Job], e
 	}, nil
 }
 
+// SimpleJob represents a download task for a single static URL.
 type SimpleJob struct {
 	url *url.URL
 }
 
+// NewJob creates a new SimpleJob from the given URL.
 func NewJob(u url.URL) *SimpleJob {
 	return &SimpleJob{url: &u}
 }
 
+// GetURL returns the target URL for this download job.
 func (s *SimpleJob) GetURL() *url.URL {
 	return s.url
 }
 
+// Download executes the HTTP GET request and streams the response body to a local file.
+// It ensures atomic writes by downloading to a temporary `.part` file first,
+// and renaming it to the final filename only upon a successful download.
+// The target filename is derived from the response headers or URL.
+// Progress is reported via the Context's ProgressBar, if configured.
 func (s *SimpleJob) Download(ctx context.Context, dir string) error {
 	req, err := http.NewRequest(http.MethodGet, s.url.String(), nil)
 	if err != nil {
@@ -87,6 +101,9 @@ func (s *SimpleJob) Download(ctx context.Context, dir string) error {
 	return os.Rename(tmpPath, target)
 }
 
+// filenameFromResponse derives the target filename for a downloaded file.
+// It prioritizes the Content-Disposition header's filename* and filename parameters,
+// falling back to the base name of the URL path, or the host name as a last resort.
 func filenameFromResponse(resp *http.Response) string {
 	filename := filepath.Base(resp.Request.URL.Path)
 	if filename == "." || filename == "/" || filename == "" {
