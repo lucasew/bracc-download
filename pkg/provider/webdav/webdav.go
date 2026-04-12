@@ -1,6 +1,7 @@
 package webdav
 
 import (
+	"bracc/pkg/errorreporter"
 	"bracc/pkg/httpcontext"
 	"bracc/pkg/provider"
 	"bracc/pkg/provider/simple"
@@ -11,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"iter"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"path"
@@ -67,7 +67,7 @@ func (p *WebDAVJobProvider) Jobs(ctx context.Context) (iter.Seq[provider.Job], e
 
 			entries, err := p.list(ctx, current)
 			if err != nil {
-				slog.Error("webdav list failed", "collection", current.String(), "error", err)
+				errorreporter.ReportError("webdav list failed", "collection", current.String(), "error", err)
 				return
 			}
 
@@ -99,7 +99,10 @@ func (p *WebDAVJobProvider) list(ctx context.Context, collection *url.URL) ([]da
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusMultiStatus {
-		b, _ := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		b, err := io.ReadAll(io.LimitReader(resp.Body, 2048))
+		if err != nil {
+			errorreporter.ReportError("failed to read webdav PROPFIND error response body", "error", err)
+		}
 		return nil, fmt.Errorf("PROPFIND %s failed: status=%d body=%q", collection, resp.StatusCode, string(b))
 	}
 

@@ -1,0 +1,1 @@
+- 2026-04-12: Ignored or swallowed errors must be handled and funneled through a centralized error-reporting module instead of being silenced.

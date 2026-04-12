@@ -1,6 +1,7 @@
 package portal_transparencia
 
 import (
+	"bracc/pkg/errorreporter"
 	"bracc/pkg/httpcontext"
 	"bracc/pkg/provider"
 	"bracc/pkg/provider/simple"
@@ -9,7 +10,6 @@ import (
 	"fmt"
 	"io"
 	"iter"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"path"
@@ -90,7 +90,7 @@ func (p *Provider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
 		for _, dataset := range datasets {
 			jobs, err := p.datasetJobs(ctx, dataset)
 			if err != nil {
-				slog.Error("portal_transparencia dataset parse error", "dataset", dataset.Slug, "url", dataset.URL.String(), "error", err)
+				errorreporter.ReportError("portal_transparencia dataset parse error", "dataset", dataset.Slug, "url", dataset.URL.String(), "error", err)
 				continue
 			}
 			for _, job := range jobs {

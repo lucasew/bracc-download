@@ -1,6 +1,7 @@
 package simple
 
 import (
+	"bracc/pkg/errorreporter"
 	"bracc/pkg/httpcontext"
 	"bracc/pkg/provider"
 	"context"
@@ -77,11 +78,15 @@ func (s *SimpleJob) Download(ctx context.Context, dir string) error {
 	_, copyErr := provider.CopyWithProgress(ctx, s, f, resp.Body, resp.ContentLength)
 	closeErr := f.Close()
 	if copyErr != nil {
-		_ = os.Remove(tmpPath)
+		if rmErr := os.Remove(tmpPath); rmErr != nil {
+			errorreporter.ReportError("failed to remove temporary file", "path", tmpPath, "error", rmErr)
+		}
 		return copyErr
 	}
 	if closeErr != nil {
-		_ = os.Remove(tmpPath)
+		if rmErr := os.Remove(tmpPath); rmErr != nil {
+			errorreporter.ReportError("failed to remove temporary file", "path", tmpPath, "error", rmErr)
+		}
 		return closeErr
 	}
 	return os.Rename(tmpPath, target)
