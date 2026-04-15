@@ -62,13 +62,17 @@ func (s *SimpleJob) Download(ctx context.Context, dir string) error {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
 		return fmt.Errorf("unexpected HTTP status %d for %s", resp.StatusCode, s.url)
 	}
 	filename := filenameFromResponse(resp)
 	provider.ProgressBarFromContext(ctx).SetName(filename)
 	target := filepath.Join(dir, filename)
 
+	return s.saveResponseBody(ctx, resp, target)
+}
+
+func (s *SimpleJob) saveResponseBody(ctx context.Context, resp *http.Response, target string) error {
 	tmpPath := target + ".part"
 	f, err := os.Create(tmpPath)
 	if err != nil {
