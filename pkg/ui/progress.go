@@ -1,4 +1,4 @@
-package main
+package ui
 
 import (
 	"fmt"
@@ -11,20 +11,20 @@ import (
 	"github.com/sethgrid/multibar"
 )
 
-type multibarFactory struct {
+type MultibarFactory struct {
 	container *multibar.BarContainer
 	mu        sync.Mutex
 }
 
-func newMultibarFactory() (*multibarFactory, error) {
+func NewMultibarFactory() (*MultibarFactory, error) {
 	container, err := multibar.New()
 	if err != nil {
 		return nil, err
 	}
-	return &multibarFactory{container: container}, nil
+	return &MultibarFactory{container: container}, nil
 }
 
-func (f *multibarFactory) NewBar(job provider.Job) provider.ProgressBar {
+func (f *MultibarFactory) NewBar(job provider.Job) provider.ProgressBar {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 

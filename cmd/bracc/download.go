@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"bracc/pkg/provider"
+	"bracc/pkg/ui"
 
 	"github.com/spf13/cobra"
 )
@@ -22,7 +23,7 @@ var downloadCommand = &cobra.Command{
 			return err
 		}
 
-		progressFactory, err := newMultibarFactory()
+		progressFactory, err := ui.NewMultibarFactory()
 		if err != nil {
 			return err
 		}

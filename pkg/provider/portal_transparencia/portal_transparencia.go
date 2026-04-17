@@ -10,7 +10,6 @@ import (
 	"io"
 	"iter"
 	"log/slog"
-	"net/http"
 	"net/url"
 	"path"
 	"regexp"
@@ -68,18 +67,11 @@ func (p *Provider) GetURL() *url.URL {
 
 func (p *Provider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
 	base := p.GetURL()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, base.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := httpcontext.Client(ctx).Do(req)
+	resp, err := httpcontext.Get(ctx, base.String())
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("unexpected HTTP status %d for %s", resp.StatusCode, base)
-	}
 
 	datasets, err := parseDatasets(base, resp.Body)
 	if err != nil {
@@ -103,18 +95,11 @@ func (p *Provider) Jobs(ctx context.Context) (iter.Seq[provider.Job], error) {
 }
 
 func (p *Provider) datasetJobs(ctx context.Context, dataset dataset) ([]provider.Job, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, dataset.URL.String(), nil)
-	if err != nil {
-		return nil, err
-	}
-	resp, err := httpcontext.Client(ctx).Do(req)
+	resp, err := httpcontext.Get(ctx, dataset.URL.String())
 	if err != nil {
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("unexpected HTTP status %d for %s", resp.StatusCode, dataset.URL)
-	}
 
 	entries, err := parseArquivoEntries(resp.Body)
 	if err != nil {

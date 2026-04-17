@@ -2,6 +2,7 @@ package httpcontext
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 )
 
@@ -43,4 +44,20 @@ func Client(ctx context.Context) *http.Client {
 		return http.DefaultClient
 	}
 	return client
+}
+
+func Get(ctx context.Context, urlStr string) (*http.Response, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, urlStr, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := Client(ctx).Do(req)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		resp.Body.Close()
+		return nil, fmt.Errorf("unexpected HTTP status %d for %s", resp.StatusCode, urlStr)
+	}
+	return resp, nil
 }

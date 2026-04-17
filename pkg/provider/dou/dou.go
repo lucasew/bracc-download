@@ -57,12 +57,12 @@ func (p *DOUJobProvider) Jobs(ctx context.Context) (iter.Seq[provider.Job], erro
 	return func(yield func(provider.Job) bool) {
 		for offset := 0; offset < p.monthsBack; offset++ {
 			d := time.Date(start.Year(), start.Month()-time.Month(offset), 1, 0, 0, 0, 0, time.UTC)
-			aamm := fmt.Sprintf("%02d%02d", d.Year()%100, int(d.Month()))
+			yearMonthSuffix := fmt.Sprintf("%02d%02d", d.Year()%100, int(d.Month()))
 
 			for _, section := range p.sections {
-				filename := fmt.Sprintf("S0%d%s.zip", section, aamm)
+				filename := fmt.Sprintf("S0%d%s.zip", section, yearMonthSuffix)
 				u := *p.baseURL
-				u.Path = path.Join(p.baseURL.Path, aamm, filename)
+				u.Path = path.Join(p.baseURL.Path, yearMonthSuffix, filename)
 				if !yield(simple.NewJob(u)) {
 					return
 				}

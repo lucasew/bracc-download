@@ -52,19 +52,11 @@ func (s *SimpleJob) GetURL() *url.URL {
 }
 
 func (s *SimpleJob) Download(ctx context.Context, dir string) error {
-	req, err := http.NewRequest(http.MethodGet, s.url.String(), nil)
-	if err != nil {
-		return err
-	}
-	req = req.WithContext(ctx)
-	resp, err := httpcontext.Client(ctx).Do(req)
+	resp, err := httpcontext.Get(ctx, s.url.String())
 	if err != nil {
 		return err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("unexpected HTTP status %d for %s", resp.StatusCode, s.url)
-	}
 	filename := filenameFromResponse(resp)
 	provider.ProgressBarFromContext(ctx).SetName(filename)
 	target := filepath.Join(dir, filename)
