@@ -8,6 +8,8 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"bracc/pkg/errorreporter"
 )
 
 type JobProvider interface {
@@ -116,7 +118,7 @@ func (r *JobRuntime) Run(ctx context.Context, destination string) error {
 		}
 		js, err := provider.Jobs(ctx)
 		if err != nil {
-			slog.Error("bad provider", "provider", provider, "error", err)
+			errorreporter.ReportError("bad provider", "provider", provider, "error", err)
 			continue
 		}
 		for job := range js {
@@ -124,20 +126,21 @@ func (r *JobRuntime) Run(ctx context.Context, destination string) error {
 				continue
 			}
 			u := job.GetURL()
-			download_dir := path.Join(destination, u.Host, strings.ReplaceAll(u.Path, "/", string(os.PathSeparator)), "_")
-			slog.Info("downloading", "url", u, "download_dir", download_dir, "job", job)
+			downloadDir := path.Join(destination, u.Host, strings.ReplaceAll(u.Path, "/", string(os.PathSeparator)), "_")
+			slog.Info("downloading", "url", u, "downloadDir", downloadDir, "job", job)
 			var bar ProgressBar = nopProgressBar{}
 			jobCtx := ctx
 			if factory := progressFactoryFromContext(ctx); factory != nil {
 				bar = factory.NewBar(job)
 				jobCtx = WithProgressBar(ctx, bar)
 			}
-			if err := os.MkdirAll(download_dir, os.ModePerm); err != nil {
+			if err := os.MkdirAll(downloadDir, os.ModePerm); err != nil {
+				errorreporter.ReportError("failed to create download dir", "downloadDir", downloadDir, "error", err)
 				return err
 			}
-			if err := job.Download(jobCtx, download_dir); err != nil {
+			if err := job.Download(jobCtx, downloadDir); err != nil {
 				bar.Complete(err)
-				slog.Error("download error", "url", u, "download_dir", download_dir)
+				errorreporter.ReportError("download error", "url", u, "downloadDir", downloadDir, "error", err)
 				continue
 			}
 			bar.Complete(nil)

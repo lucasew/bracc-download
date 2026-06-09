@@ -1,0 +1,2 @@
+- 2025-06-09: Use camelCase for variables instead of snake_case to conform with Go conventions.
+- 2025-06-09: All unexpected errors must funnel through `errorreporter.ReportError` instead of using `slog.Error` directly or returning without reporting.
