@@ -11,11 +11,12 @@ import (
 	"fmt"
 	"io"
 	"iter"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"path"
 	"strings"
+
+	"bracc/pkg/errorreporter"
 )
 
 const propfindBody = `<?xml version="1.0" encoding="utf-8" ?>
@@ -67,7 +68,7 @@ func (p *WebDAVJobProvider) Jobs(ctx context.Context) (iter.Seq[provider.Job], e
 
 			entries, err := p.list(ctx, current)
 			if err != nil {
-				slog.Error("webdav list failed", "collection", current.String(), "error", err)
+				errorreporter.ReportError(err, "webdav list failed", "collection", current.String())
 				return
 			}
 

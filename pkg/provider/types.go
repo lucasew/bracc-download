@@ -8,6 +8,8 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"bracc/pkg/errorreporter"
 )
 
 type JobProvider interface {
@@ -116,7 +118,7 @@ func (r *JobRuntime) Run(ctx context.Context, destination string) error {
 		}
 		js, err := provider.Jobs(ctx)
 		if err != nil {
-			slog.Error("bad provider", "provider", provider, "error", err)
+			errorreporter.ReportError(err, "bad provider", "provider", provider)
 			continue
 		}
 		for job := range js {
@@ -137,7 +139,7 @@ func (r *JobRuntime) Run(ctx context.Context, destination string) error {
 			}
 			if err := job.Download(jobCtx, download_dir); err != nil {
 				bar.Complete(err)
-				slog.Error("download error", "url", u, "download_dir", download_dir)
+				errorreporter.ReportError(err, "download error", "url", u, "download_dir", download_dir)
 				continue
 			}
 			bar.Complete(nil)

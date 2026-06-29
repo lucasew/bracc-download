@@ -1,13 +1,14 @@
 package main
 
 import (
-	"log/slog"
 	"os"
+
+	"bracc/pkg/errorreporter"
 )
 
 func main() {
 	if err := Command.Execute(); err != nil {
-		slog.Error("error", "error", err)
+		errorreporter.ReportError(err, "error")
 		os.Exit(1)
 	}
 }

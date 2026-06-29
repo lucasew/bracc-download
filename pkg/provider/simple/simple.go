@@ -11,6 +11,8 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+
+	"bracc/pkg/errorreporter"
 )
 
 type SimpleJobProvider struct {
@@ -77,11 +79,15 @@ func (s *SimpleJob) Download(ctx context.Context, dir string) error {
 	_, copyErr := provider.CopyWithProgress(ctx, s, f, resp.Body, resp.ContentLength)
 	closeErr := f.Close()
 	if copyErr != nil {
-		_ = os.Remove(tmpPath)
+		if rmErr := os.Remove(tmpPath); rmErr != nil {
+			errorreporter.ReportError(rmErr, "failed to remove temp file", "path", tmpPath)
+		}
 		return copyErr
 	}
 	if closeErr != nil {
-		_ = os.Remove(tmpPath)
+		if rmErr := os.Remove(tmpPath); rmErr != nil {
+			errorreporter.ReportError(rmErr, "failed to remove temp file", "path", tmpPath)
+		}
 		return closeErr
 	}
 	return os.Rename(tmpPath, target)
