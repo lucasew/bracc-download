@@ -65,11 +65,16 @@ func (s *SimpleJob) Download(ctx context.Context, dir string) error {
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return fmt.Errorf("unexpected HTTP status %d for %s", resp.StatusCode, s.url)
 	}
-	filename := filenameFromResponse(resp)
+	filename := filepath.Base(filepath.Clean(filenameFromResponse(resp)))
+	if filename == "." || filename == "/" {
+		filename = "downloaded_file"
+	}
 	provider.ProgressBarFromContext(ctx).SetName(filename)
 	target := filepath.Join(dir, filename)
 
 	tmpPath := target + ".part"
+	// filepath.Base prevents path traversal by extracting only the last element
+	// #nosec G304
 	f, err := os.Create(tmpPath)
 	if err != nil {
 		return err
