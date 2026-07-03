@@ -1,6 +1,7 @@
 package portal_transparencia
 
 import (
+	"bracc/pkg/errorreporter"
 	"bracc/pkg/httpcontext"
 	"bracc/pkg/provider"
 	"bracc/pkg/provider/simple"
@@ -49,6 +50,7 @@ type Provider struct {
 func init() {
 	p, err := NewProvider()
 	if err != nil {
+		errorreporter.ReportError(err)
 		panic(err)
 	}
 	provider.Providers = append(provider.Providers, p)

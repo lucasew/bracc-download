@@ -1,6 +1,7 @@
 package dou
 
 import (
+	"bracc/pkg/errorreporter"
 	"bracc/pkg/provider"
 	"bracc/pkg/provider/simple"
 	"context"
@@ -18,6 +19,7 @@ const (
 func init() {
 	p, err := NewDOUJobProvider(24)
 	if err != nil {
+		errorreporter.ReportError(err)
 		panic(err)
 	}
 	provider.Providers = append(provider.Providers, p)

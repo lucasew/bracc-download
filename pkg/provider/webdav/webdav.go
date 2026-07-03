@@ -1,6 +1,7 @@
 package webdav
 
 import (
+	"bracc/pkg/errorreporter"
 	"bracc/pkg/httpcontext"
 	"bracc/pkg/provider"
 	"bracc/pkg/provider/simple"
@@ -11,7 +12,6 @@ import (
 	"fmt"
 	"io"
 	"iter"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"path"
@@ -67,7 +67,7 @@ func (p *WebDAVJobProvider) Jobs(ctx context.Context) (iter.Seq[provider.Job], e
 
 			entries, err := p.list(ctx, current)
 			if err != nil {
-				slog.Error("webdav list failed", "collection", current.String(), "error", err)
+				errorreporter.ReportError(err, "msg", "webdav list failed", "collection", current.String())
 				return
 			}
 

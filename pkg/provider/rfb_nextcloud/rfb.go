@@ -1,6 +1,7 @@
 package rfb_nextcloud
 
 import (
+	"bracc/pkg/errorreporter"
 	"bracc/pkg/provider"
 	"bracc/pkg/provider/webdav"
 )
@@ -8,6 +9,7 @@ import (
 func init() {
 	p, err := NewProvider()
 	if err != nil {
+		errorreporter.ReportError(err)
 		panic(err)
 	}
 	provider.Providers = append(provider.Providers, p)
