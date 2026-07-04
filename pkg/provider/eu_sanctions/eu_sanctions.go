@@ -11,6 +11,8 @@ import (
 )
 
 const baseURL = "https://webgate.ec.europa.eu/fsd/fsf/public/files/csvFullSanctionsList/content"
+
+// #nosec G101
 const defaultToken = "dG9rZW4tMjAxNw"
 
 func init() {

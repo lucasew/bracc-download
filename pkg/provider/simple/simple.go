@@ -67,9 +67,12 @@ func (s *SimpleJob) Download(ctx context.Context, dir string) error {
 	}
 	filename := filenameFromResponse(resp)
 	provider.ProgressBarFromContext(ctx).SetName(filename)
-	target := filepath.Join(dir, filename)
 
+	targetDir := filepath.Clean(dir)
+	target := filepath.Join(targetDir, filepath.Clean(filepath.Join("/", filename)))
 	tmpPath := target + ".part"
+
+	// #nosec G304 -- We construct paths using filepath.Join safely.
 	f, err := os.Create(tmpPath)
 	if err != nil {
 		return err
