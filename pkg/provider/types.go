@@ -125,20 +125,20 @@ func (r *JobRuntime) Run(ctx context.Context, destination string) error {
 				continue
 			}
 			u := job.GetURL()
-			download_dir := path.Join(destination, u.Host, strings.ReplaceAll(u.Path, "/", string(os.PathSeparator)), "_")
-			slog.Info("downloading", "url", u, "download_dir", download_dir, "job", job)
+			downloadDir := path.Join(destination, u.Host, strings.ReplaceAll(u.Path, "/", string(os.PathSeparator)), "_")
+			slog.Info("downloading", "url", u, "downloadDir", downloadDir, "job", job)
 			var bar ProgressBar = nopProgressBar{}
 			jobCtx := ctx
 			if factory := progressFactoryFromContext(ctx); factory != nil {
 				bar = factory.NewBar(job)
 				jobCtx = WithProgressBar(ctx, bar)
 			}
-			if err := os.MkdirAll(download_dir, 0750); err != nil {
+			if err := os.MkdirAll(downloadDir, 0750); err != nil {
 				return err
 			}
-			if err := job.Download(jobCtx, download_dir); err != nil {
+			if err := job.Download(jobCtx, downloadDir); err != nil {
 				bar.Complete(err)
-				errorreporter.ReportError(err, "msg", "download error", "url", u, "download_dir", download_dir)
+				errorreporter.ReportError(err, "msg", "download error", "url", u, "downloadDir", downloadDir)
 				continue
 			}
 			bar.Complete(nil)
